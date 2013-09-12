@@ -5,8 +5,9 @@ public class RoutingTableEntry {
 	private Node destinationNode;
 	private Integer hopCount;
 	private String nextHopAddress;
-	private Boolean isValid;
+	private Boolean valid;
 	private Long Timeout;
+	private Integer sequenceNumber;
 	
 	public Node getDestinationNode() {
 		return destinationNode;
@@ -26,17 +27,23 @@ public class RoutingTableEntry {
 	public void setNextHopAddress(String nextHopAddress) {
 		this.nextHopAddress = nextHopAddress;
 	}
-	public Boolean getIsValid() {
-		return isValid;
+	public Boolean isValid() {
+		return valid;
 	}
-	public void setIsValid(Boolean isValid) {
-		this.isValid = isValid;
+	public void setValid(Boolean isValid) {
+		this.valid = isValid;
 	}
 	public Long getTimeout() {
 		return Timeout;
 	}
 	public void setTimeout(Long timeout) {
 		Timeout = timeout;
+	}
+	public Integer getSequenceNumber() {
+		return sequenceNumber;
+	}
+	public void setSequenceNumber(Integer sequenceNumber) {
+		this.sequenceNumber = sequenceNumber;
 	}
 
 }

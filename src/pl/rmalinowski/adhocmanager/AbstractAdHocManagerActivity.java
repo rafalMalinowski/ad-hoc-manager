@@ -22,7 +22,6 @@ public abstract class AbstractAdHocManagerActivity extends Activity{
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		registerBroadcastRecievers();
 	}
 	
 	@Override
@@ -35,6 +34,7 @@ public abstract class AbstractAdHocManagerActivity extends Activity{
 	@Override
 	protected void onResume() {
 		super.onResume();
+		registerBroadcastRecievers();
 		bindService(new Intent(this, AodvService.class), mConnection, Context.BIND_AUTO_CREATE);
 	}
 	

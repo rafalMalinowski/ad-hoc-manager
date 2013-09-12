@@ -11,10 +11,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
+import pl.rmalinowski.adhocmanager.model.Node;
 import pl.rmalinowski.adhocmanager.model.PhysicalLayerEvent;
 import pl.rmalinowski.adhocmanager.model.PhysicalLayerEventType;
 import pl.rmalinowski.adhocmanager.model.PhysicalLayerState;
 import pl.rmalinowski.adhocmanager.model.packets.Packet;
+import pl.rmalinowski.adhocmanager.persistence.NodeDao;
 import pl.rmalinowski.adhocmanager.utils.SerializationUtils;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -41,12 +43,15 @@ public class BluetoothService extends PhysicalLayerService {
 	BluetoothAdapter bluetoothAdapter;
 	private volatile int activeSearchesNumber;
 	private volatile PhysicalLayerState state;
+	private NodeDao nodeDao;
 
 	@Override
 	public void onCreate() {
 		super.onCreate();
 		registerBroadcastRecievers();
 		initialize();
+		nodeDao = new NodeDao(this);
+		nodeDao.open();
 	}
 
 	@Override
@@ -58,7 +63,7 @@ public class BluetoothService extends PhysicalLayerService {
 		} else {
 			connectedDevices = new HashMap<String, ActiveConnectionThread>();
 			initializeUUIDList();
-			// startListeningThread();
+			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PHYSICAL_LAYER_INITIALIZED));
 		}
 
 	}
@@ -71,27 +76,26 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void sendPacket(Packet packet, String destination) {
-		// TODO Auto-generated method stub
-
+		if (connectedDevices.containsKey(destination)) {
+			connectedDevices.get(destination).write(packet);
+		}
 	}
 
 	@Override
 	public void connectToNeighbours() {
 		Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-		for (BluetoothDevice device : pairedDevices) {
-			if (!isCommunicationWithDeviceActive(device)) {
-				connectToDevice(device, 1);
-				increaseNumberOfActiveSearches();
+		if (pairedDevices.size() > 0) {
+
+			for (BluetoothDevice device : pairedDevices) {
+				if (!isCommunicationWithDeviceActive(device)) {
+					connectToDevice(device, 1);
+					increaseNumberOfActiveSearches();
+				}
 			}
+		} else {
+			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTING_TO_NEIGHBOURS_FINISHED));
 		}
 	}
-
-	//
-	// private Set<BluetoothDevice> getListOfConnectedDevices(){
-	// Set<BluetoothDevice> connectedDevices = new HashSet<BluetoothDevice>();
-	// for (connectedDevices)
-	// return null;
-	// }
 
 	private boolean isCommunicationWithDeviceActive(BluetoothDevice device) {
 		if (connectedDevices.containsKey(device.getAddress())) {
@@ -155,11 +159,15 @@ public class BluetoothService extends PhysicalLayerService {
 			} else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
 				Log.d(TAG, "Skonczono przeszukiwanie");
 			} else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+				BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
 				int prevBondState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
 				int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
 
 				if (prevBondState == BluetoothDevice.BOND_BONDING && bondState == BluetoothDevice.BOND_BONDED) {
+					if (nodeDao.getByMacAddress(device.getAddress()) == null) {
+						nodeDao.create(new Node(device.getAddress(), device.getName()));
+					}
 					Log.d(TAG, "Wlasnie powiazano");
 				}
 			} else if (PhysicalLayerService.PHYSICAL_LAYER_MESSAGE.equals(action)) {
@@ -177,6 +185,7 @@ public class BluetoothService extends PhysicalLayerService {
 				startListeningThread();
 				state = PhysicalLayerState.INITIALIZED;
 			}
+			break;
 		default:
 			break;
 		}
@@ -364,10 +373,10 @@ public class BluetoothService extends PhysicalLayerService {
 		possibleUuids = new ArrayList<UUID>();
 		possibleUuids.add(UUID.fromString("503c7430-bc23-11de-8a39-0800200c9a66"));
 		possibleUuids.add(UUID.fromString("503c7431-bc23-11de-8a39-0800200c9a66"));
-		possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
-		possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
-		possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
-		possibleUuids.add(UUID.fromString("503c7435-bc23-11de-8a39-0800200c9a66"));
+		// possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
+		// possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
+		// possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
+		// possibleUuids.add(UUID.fromString("503c7435-bc23-11de-8a39-0800200c9a66"));
 	}
 
 	@Override
@@ -382,7 +391,7 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void onDestroy() {
-		// TODO Auto-generated method stub
+		nodeDao.close();
 		super.onDestroy();
 	}
 

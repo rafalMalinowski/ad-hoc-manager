@@ -11,5 +11,7 @@
     <string name="find_devices">Find Devices</string>
     <string name="search">Search</string>
     <string name="connect">Connect</string>
+    <string name="send">Send</string>
+    <string name="discoverable">Discoverable</string>
 
 </resources>

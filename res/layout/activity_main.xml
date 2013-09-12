@@ -35,20 +35,21 @@
         android:text="@string/connect" />
 
     <Button
-        android:id="@+id/main_exit_button"
+        android:id="@+id/main_send_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/main_connect_button"
         android:layout_alignRight="@+id/main_connect_button"
         android:layout_below="@+id/main_connect_button"
-        android:text="@string/exit_button" />
+        android:text="@string/send" />
 
     <Button
-        android:id="@+id/button1"
+        android:id="@+id/main_exit_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/main_exit_button"
-        android:layout_below="@+id/main_exit_button"
-        android:text="Button" />
+        android:layout_alignLeft="@+id/main_send_button"
+        android:layout_alignRight="@+id/main_send_button"
+        android:layout_below="@+id/main_send_button"
+        android:text="@string/exit_button" />
 
 </RelativeLayout>

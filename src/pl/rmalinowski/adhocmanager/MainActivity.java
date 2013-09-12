@@ -8,9 +8,11 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.Toast;
 
 public class MainActivity extends AbstractAdHocManagerActivity implements OnClickListener {
 
@@ -19,6 +21,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 	private Button searchButton;
 	private Button bluetoothButton;
 	private Button connectButton;
+	private Button sendButton;
 	private Button exitButton;
 
 	@Override
@@ -40,6 +43,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		searchButton = (Button) findViewById(R.id.main_search_for_devices);
 		bluetoothButton = (Button) findViewById(R.id.main_button_bluetooth);
 		connectButton = (Button) findViewById(R.id.main_connect_button);
+		sendButton = (Button) findViewById(R.id.main_send_button);
 		exitButton = (Button) findViewById(R.id.main_exit_button);
 	}
 
@@ -47,6 +51,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		searchButton.setOnClickListener(this);
 		bluetoothButton.setOnClickListener(this);
 		connectButton.setOnClickListener(this);
+		sendButton.setOnClickListener(this);
 		exitButton.setOnClickListener(this);
 	}
 
@@ -61,6 +66,10 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			String actionName = (String) event.getData();
 			Intent enableIntent = new Intent(actionName);
 			startActivityForResult(enableIntent, ADAPTED_DISABLED_BROADCAST_EVENT);
+			break;
+		case SHOW_TOAST:
+			String textToShow = (String) event.getData();
+			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
 			break;
 		default:
 			break;
@@ -84,6 +93,8 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			networkService.searchForDevices();
 		case R.id.main_connect_button:
 			networkService.connectToNeighbours();
+		case R.id.main_send_button:
+			networkService.sendBroadcastData("dziala");
 		default:
 			break;
 		}
@@ -101,6 +112,26 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 				finish();
 			}
 			break;
+		}
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case R.id.discoverable:
+			ensureDiscoverable();
+			return true;
+		default:
+			break;
+		}
+		return false;
+	}
+
+	private void ensureDiscoverable() {
+		if (BluetoothAdapter.getDefaultAdapter().getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+			Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+			discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 5000);
+			startActivity(discoverableIntent);
 		}
 	}
 
