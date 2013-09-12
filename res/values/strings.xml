@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">AdHocManager</string>
+    <string name="action_settings">Settings</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="initialize_button">Initialize</string>
+    <string name="bluetooth">Bluetooh</string>
+    <string name="exit_button">Exit</string>
+    <string name="start_network">Start Network</string>
+    <string name="find_devices">Find Devices</string>
+    <string name="search">Search</string>
+    <string name="connect">Connect</string>
+
+</resources>
