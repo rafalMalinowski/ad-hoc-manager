@@ -4,7 +4,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 public class RREQMessage implements RoutingPacket {
-	
+
+	private static final long serialVersionUID = -2117920292379283560L;
 	private Integer hopCount;
 	private Integer id;
 	private String destinationAddress;

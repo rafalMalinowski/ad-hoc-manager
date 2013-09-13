@@ -9,8 +9,6 @@ public interface INetworkLayerService{
 	
 	public void sendBroadcastData(Serializable data);
 	
-	public String getText();
-	
 	public void reInitialize();
 	
 	public void searchForDevices();

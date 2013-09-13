@@ -2,7 +2,7 @@ package pl.rmalinowski.adhocmanager;
 
 import pl.rmalinowski.adhocmanager.api.impl.AodvService;
 import pl.rmalinowski.adhocmanager.api.impl.BluetoothService;
-import pl.rmalinowski.adhocmanager.model.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
@@ -91,10 +91,13 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			break;
 		case R.id.main_search_for_devices:
 			networkService.searchForDevices();
+			break;
 		case R.id.main_connect_button:
 			networkService.connectToNeighbours();
+			break;
 		case R.id.main_send_button:
 			networkService.sendBroadcastData("dziala");
+			break;
 		default:
 			break;
 		}
@@ -133,6 +136,12 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 5000);
 			startActivity(discoverableIntent);
 		}
+	}
+	
+	@Override
+	protected void onDestroy() {
+		stopService(new Intent(this, AodvService.class));
+		super.onDestroy();
 	}
 
 }

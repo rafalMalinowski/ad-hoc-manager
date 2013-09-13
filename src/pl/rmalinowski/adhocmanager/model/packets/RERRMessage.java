@@ -6,6 +6,7 @@ import pl.rmalinowski.adhocmanager.model.Node;
 
 public class RERRMessage implements RoutingPacket {
 
+	private static final long serialVersionUID = -7082857864999539176L;
 	private boolean flagN;
 	private List<Node> unreachableNodes;
 	

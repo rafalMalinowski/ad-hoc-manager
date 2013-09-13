@@ -5,6 +5,7 @@ import java.util.Map;
 
 public class RREPMessage implements RoutingPacket {
 
+	private static final long serialVersionUID = -8562781898617320600L;
 	private Integer hopCount;
 	private String destinationAddress;
 	private Integer destinationSeq;

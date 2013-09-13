@@ -6,9 +6,15 @@ public class RoutingTableEntry {
 	private Integer hopCount;
 	private String nextHopAddress;
 	private Boolean valid;
-	private Long Timeout;
+	private Long timeout;
 	private Integer sequenceNumber;
 	
+	public RoutingTableEntry(Node destinationNode) {
+		super();
+		this.destinationNode = destinationNode;
+		this.sequenceNumber = 0;
+		this.valid = false;
+	}
 	public Node getDestinationNode() {
 		return destinationNode;
 	}
@@ -34,10 +40,10 @@ public class RoutingTableEntry {
 		this.valid = isValid;
 	}
 	public Long getTimeout() {
-		return Timeout;
+		return timeout;
 	}
 	public void setTimeout(Long timeout) {
-		Timeout = timeout;
+		this.timeout = timeout;
 	}
 	public Integer getSequenceNumber() {
 		return sequenceNumber;

@@ -2,7 +2,7 @@ package pl.rmalinowski.adhocmanager;
 
 import pl.rmalinowski.adhocmanager.api.NetworkLayerService;
 import pl.rmalinowski.adhocmanager.api.impl.AodvService;
-import pl.rmalinowski.adhocmanager.model.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;

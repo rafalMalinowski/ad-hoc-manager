@@ -6,14 +6,15 @@ import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
+import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
+import pl.rmalinowski.adhocmanager.events.PhysicalLayerEventType;
 import pl.rmalinowski.adhocmanager.model.Node;
-import pl.rmalinowski.adhocmanager.model.PhysicalLayerEvent;
-import pl.rmalinowski.adhocmanager.model.PhysicalLayerEventType;
 import pl.rmalinowski.adhocmanager.model.PhysicalLayerState;
 import pl.rmalinowski.adhocmanager.model.packets.Packet;
 import pl.rmalinowski.adhocmanager.persistence.NodeDao;
@@ -59,7 +60,7 @@ public class BluetoothService extends PhysicalLayerService {
 		state = PhysicalLayerState.INITIALIZING;
 		bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 		if (!bluetoothAdapter.isEnabled()) {
-			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.BLUETOOTH_NOT_ENABLED));
+			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.ADAPTER_NOT_ENABLED, BluetoothAdapter.ACTION_REQUEST_ENABLE));
 		} else {
 			connectedDevices = new HashMap<String, ActiveConnectionThread>();
 			initializeUUIDList();
@@ -83,12 +84,11 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void connectToNeighbours() {
-		Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-		if (pairedDevices.size() > 0) {
-
-			for (BluetoothDevice device : pairedDevices) {
-				if (!isCommunicationWithDeviceActive(device)) {
-					connectToDevice(device, 1);
+		Set<Node> nodes = nodeDao.getAllNodes();
+		if (nodes.size() > 0) {
+			for (Node node : nodes) {
+				if (!isCommunicationWithDeviceActive(node.getAddress())) {
+					connectToDevice(node, 1);
 					increaseNumberOfActiveSearches();
 				}
 			}
@@ -96,9 +96,10 @@ public class BluetoothService extends PhysicalLayerService {
 			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTING_TO_NEIGHBOURS_FINISHED));
 		}
 	}
+	
 
-	private boolean isCommunicationWithDeviceActive(BluetoothDevice device) {
-		if (connectedDevices.containsKey(device.getAddress())) {
+	private boolean isCommunicationWithDeviceActive(String address) {
+		if (connectedDevices.containsKey(address)) {
 			return true;
 		} else {
 			return false;
@@ -108,6 +109,16 @@ public class BluetoothService extends PhysicalLayerService {
 	private synchronized void connectToDevice(BluetoothDevice blueDevice, int numberOfRetries) {
 		ConnnectionMakerThread connnectionMakerThread = new ConnnectionMakerThread(blueDevice, numberOfRetries);
 		connnectionMakerThread.start();
+	}
+	
+	private synchronized void connectToDevice(Node node, int numberOfRetries) {
+		Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+		for (BluetoothDevice device : pairedDevices){
+			if (device.getAddress().equals(node.getAddress())){
+				connectToDevice(device, numberOfRetries);
+				break;
+			}
+		}
 	}
 
 	private synchronized void increaseNumberOfActiveSearches() {
@@ -120,11 +131,20 @@ public class BluetoothService extends PhysicalLayerService {
 			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTING_TO_NEIGHBOURS_FINISHED));
 		}
 	}
+	
+	private synchronized void removeFromConnectedThreads(String address){
+		connectedDevices.remove(address);
+	}
 
 	@Override
-	public void getConnectedDevices() {
-		// TODO Auto-generated method stub
-
+	public Set<Node> getConnectedDevices() {
+		Set<Node> returnNodes = new HashSet<Node>();
+		for (Node node : nodeDao.getAllNodes()){
+			if (isCommunicationWithDeviceActive(node.getAddress())){
+				returnNodes.add(node);
+			}
+		}
+		return returnNodes;
 	}
 
 	@Override
@@ -166,8 +186,12 @@ public class BluetoothService extends PhysicalLayerService {
 
 				if (prevBondState == BluetoothDevice.BOND_BONDING && bondState == BluetoothDevice.BOND_BONDED) {
 					if (nodeDao.getByMacAddress(device.getAddress()) == null) {
-						nodeDao.create(new Node(device.getAddress(), device.getName()));
+						Node newNode = new Node(device.getAddress(), device.getName());
+						long id = nodeDao.create(newNode);
+						newNode.setId(id);
+						sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.NEW_NODE_ADDED, newNode));
 					}
+					
 					Log.d(TAG, "Wlasnie powiazano");
 				}
 			} else if (PhysicalLayerService.PHYSICAL_LAYER_MESSAGE.equals(action)) {
@@ -215,6 +239,8 @@ public class BluetoothService extends PhysicalLayerService {
 		connectionThread.start();
 		connectedDevices.put(bluetoothSocket.getRemoteDevice().getAddress(), connectionThread);
 	}
+	
+	//////////////////////////////////////////////////////
 
 	private class ConnectionReceiverThread extends Thread {
 		BluetoothServerSocket serverSocket = null;
@@ -249,6 +275,8 @@ public class BluetoothService extends PhysicalLayerService {
 			}
 		}
 	}
+	
+	///////////////////////////////////////////////////
 
 	private class ActiveConnectionThread extends Thread {
 		private final BluetoothSocket blueSocket;
@@ -275,11 +303,11 @@ public class BluetoothService extends PhysicalLayerService {
 				while (true) {
 					inStream.read(buffer);
 					Packet packet = (Packet) SerializationUtils.deserialize(buffer);
-					sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.DATA_PACKET_RECEIVED, packet));
-
+					sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PACKET_RECEIVED, packet));
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
+				removeFromConnectedThreads(blueSocket.getRemoteDevice().getAddress());
 				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_LOST, blueSocket.getRemoteDevice().getAddress()));
 			}
 		}
@@ -288,7 +316,7 @@ public class BluetoothService extends PhysicalLayerService {
 			try {
 				byte[] buffer = SerializationUtils.serialize(packet);
 				outStream.write(buffer);
-				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.DATA_PACKET_SEND, packet));
+				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PACKET_SEND, packet));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -301,12 +329,10 @@ public class BluetoothService extends PhysicalLayerService {
 				e.printStackTrace();
 			}
 		}
-
-		public BluetoothDevice getBluetoothDevice() {
-			return blueSocket.getRemoteDevice();
-		}
 	}
 
+	/////////////////////////////////////////////////////
+	
 	private class ConnnectionMakerThread extends Thread {
 		BluetoothDevice blueDevice;
 		private static final int CONNECTION_RETRY_DELAY = 100;
@@ -383,15 +409,27 @@ public class BluetoothService extends PhysicalLayerService {
 	public IBinder onBind(Intent intent) {
 		return mBinder;
 	}
+	
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		return Service.START_NOT_STICKY;
 	}
+	
+	private void stopAllThreads(){
+		connectionReceiverThread.cancel();
+		for (ActiveConnectionThread thread : connectedDevices.values()){
+			thread.cancel();
+		}
+		connectedDevices = null;
+	}
 
 	@Override
 	public void onDestroy() {
 		nodeDao.close();
+		stopAllThreads();
+		unregisterReceiver(broadcastReceiver);
+		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
 		super.onDestroy();
 	}
 

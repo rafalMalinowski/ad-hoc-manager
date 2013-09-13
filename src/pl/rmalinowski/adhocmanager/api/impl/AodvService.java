@@ -7,24 +7,28 @@ import java.util.Set;
 
 import pl.rmalinowski.adhocmanager.api.NetworkLayerService;
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
+import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.events.NetworkLayerEventType;
+import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
 import pl.rmalinowski.adhocmanager.exceptions.BadAddressException;
-import pl.rmalinowski.adhocmanager.model.NetworkLayerEvent;
-import pl.rmalinowski.adhocmanager.model.NetworkLayerEventType;
 import pl.rmalinowski.adhocmanager.model.Node;
-import pl.rmalinowski.adhocmanager.model.PhysicalLayerEvent;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
 import pl.rmalinowski.adhocmanager.model.packets.DataPacket;
+import pl.rmalinowski.adhocmanager.model.packets.HelloMessage;
+import pl.rmalinowski.adhocmanager.model.packets.Packet;
+import pl.rmalinowski.adhocmanager.model.packets.RERRMessage;
+import pl.rmalinowski.adhocmanager.model.packets.RREPAckMessage;
+import pl.rmalinowski.adhocmanager.model.packets.RREPMessage;
+import pl.rmalinowski.adhocmanager.model.packets.RREQMessage;
+import pl.rmalinowski.adhocmanager.model.packets.RoutingPacket;
 import pl.rmalinowski.adhocmanager.persistence.NodeDao;
 import android.app.Service;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.database.Cursor;
 import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 
@@ -49,17 +53,15 @@ public class AodvService extends NetworkLayerService {
 	@Override
 	public void sendData(Serializable data, String address) {
 		RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
-		if (entry != null && entry.isValid()){
+		if (entry != null && entry.isValid()) {
 			physicalService.sendPacket(new DataPacket(data), address);
 		}
 	}
-	
-	
 
 	private void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
 		switch (event.getEventType()) {
-		case BLUETOOTH_NOT_ENABLED:
-			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED, BluetoothAdapter.ACTION_REQUEST_ENABLE));
+		case ADAPTER_NOT_ENABLED:
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED, event.getData()));
 			break;
 		case CONNECTION_TO_NEIGHBOUR_ESTABLISHED:
 			String address = (String) event.getData();
@@ -75,13 +77,65 @@ public class AodvService extends NetworkLayerService {
 		case CONNECTING_TO_NEIGHBOURS_FINISHED:
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "uruchomiono wartswe fizyczna"));
 			break;
-		case DATA_PACKET_RECEIVED:
-			DataPacket packet = (DataPacket) event.getData();
-			String message = (String)packet.getData();
-			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "otrzymalem pakiet: " + message));
+		case PACKET_RECEIVED:
+			handleRecievedPacket((Packet) event.getData());
+			break;
+		case NEW_NODE_ADDED:
+			Node node = (Node) event.getData();
+			RoutingTableEntry newEntry = new RoutingTableEntry(node);
+			routingTable.add(newEntry);
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "dodano nowy wezel"));
+			break;
 		default:
 			break;
 		}
+	}
+
+	private void handleRecievedPacket(Packet packet) {
+		if (packet instanceof DataPacket) {
+			handleRecievedRoutingPacket((DataPacket) packet);
+		} else if (packet instanceof RoutingPacket) {
+			handleRecievedDataPacket((RoutingPacket) packet);
+		}
+	}
+
+	private void handleRecievedRoutingPacket(DataPacket dataPacket) {
+		String message = (String) dataPacket.getData();
+		sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "otrzymalem pakiet: " + message));
+	}
+
+	private void handleRecievedDataPacket(RoutingPacket message) {
+		if (message instanceof RERRMessage) {
+			handleRERRMessage((RERRMessage) message);
+		} else if (message instanceof RREQMessage) {
+			handleRREQMessage((RREQMessage) message);
+		} else if (message instanceof RREPMessage) {
+			handleRREPMessage((RREPMessage) message);
+		} else if (message instanceof RREPAckMessage) {
+			handleRREPAckMessage((RREPAckMessage) message);
+		} else if (message instanceof HelloMessage) {
+			handleHelloMessage((HelloMessage) message);
+		}
+	}
+
+	private void handleRERRMessage(RERRMessage message) {
+
+	}
+
+	private void handleRREQMessage(RREQMessage message) {
+
+	}
+
+	private void handleRREPMessage(RREPMessage message) {
+
+	}
+
+	private void handleRREPAckMessage(RREPAckMessage message) {
+
+	}
+
+	private void handleHelloMessage(HelloMessage message) {
+
 	}
 
 	private void sendNetworkBroadcast(NetworkLayerEvent event) {
@@ -90,31 +144,12 @@ public class AodvService extends NetworkLayerService {
 		LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
 	}
 
-	// TODO do poprawy, zeby nie korzystal z bluetoothAdaptera tylko wyciagal z bazy danych
 	private void initializeRoutingTable() {
 		routingTable = new ArrayList<RoutingTableEntry>();
-		BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
-		Set<BluetoothDevice> bondedDevices = ba.getBondedDevices();
-		for (BluetoothDevice bd : bondedDevices) {
-			RoutingTableEntry entry = new RoutingTableEntry();
-			Node node = new Node();
-			node.setAddress(bd.getAddress());
-			entry.setSequenceNumber(0);
-			entry.setDestinationNode(node);
-			entry.setValid(false);
+		Set<Node> nodes = nodeDao.getAllNodes();
+		for (Node node : nodes) {
+			RoutingTableEntry entry = new RoutingTableEntry(node);
 			routingTable.add(entry);
-		}
-		
-		Set<BluetoothDevice> bonded = BluetoothAdapter.getDefaultAdapter().getBondedDevices();
-		Node node = null;
-		for (BluetoothDevice device : bonded){
-			node = nodeDao.getByMacAddress(device.getAddress());
-		}
-		Cursor cursor = nodeDao.getAll();
-		nodeDao.create(new Node("aaaa", "bbbb"));
-		List<Node> nodes = nodeDao.getAllNodes();
-		if (nodes.size()>0){
-			
 		}
 	}
 
@@ -146,13 +181,11 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	@Override
-	public String getText() {
-		return "OK!";
-	}
-
-	@Override
 	public void onDestroy() {
 		nodeDao.close();
+		unbindService(mConnection);
+		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
+		stopService(new Intent(this, BluetoothService.class));
 		super.onDestroy();
 	}
 
@@ -173,13 +206,11 @@ public class AodvService extends NetworkLayerService {
 
 	@Override
 	public void searchForDevices() {
-
 		physicalService.searchForNeighbours();
 	}
 
 	@Override
 	public void connectToNeighbours() {
-
 		physicalService.connectToNeighbours();
 	}
 
@@ -194,7 +225,7 @@ public class AodvService extends NetworkLayerService {
 
 	private RoutingTableEntry findRoutingTableEntryForAddress(String address) {
 		for (RoutingTableEntry entry : routingTable) {
-			if (address.equals(entry.getDestinationNode().getAddress())){
+			if (address.equals(entry.getDestinationNode().getAddress())) {
 				return entry;
 			}
 		}
@@ -204,7 +235,7 @@ public class AodvService extends NetworkLayerService {
 	@Override
 	public void sendBroadcastData(Serializable data) {
 		for (RoutingTableEntry entry : routingTable) {
-			if (entry != null && entry.isValid()){
+			if (entry != null && entry.isValid()) {
 				physicalService.sendPacket(new DataPacket(data), entry.getDestinationNode().getAddress());
 			}
 		}

@@ -1,5 +1,8 @@
 package pl.rmalinowski.adhocmanager.api;
 
+import java.util.Set;
+
+import pl.rmalinowski.adhocmanager.model.Node;
 import pl.rmalinowski.adhocmanager.model.packets.Packet;
 
 public interface IPhysicalLayerService {
@@ -12,5 +15,5 @@ public interface IPhysicalLayerService {
 
 	public void connectToNeighbours();
 	
-	public void getConnectedDevices();
+	public Set<Node> getConnectedDevices();
 }

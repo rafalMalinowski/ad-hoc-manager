@@ -1,5 +1,5 @@
 package pl.rmalinowski.adhocmanager.model.packets;
 
-public interface RoutingPacket {
+public interface RoutingPacket extends Packet{
 
 }
