@@ -11,9 +11,13 @@ public interface IPhysicalLayerService {
 	
 	public void sendPacket(Packet packet, String destination);
 	
+	public void sendPacketBroadcast(Packet packet);
+	
 	public void searchForNeighbours();
 
 	public void connectToNeighbours();
 	
 	public Set<Node> getConnectedDevices();
+	
+	public String getLocalAddress();
 }

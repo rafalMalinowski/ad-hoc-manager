@@ -1,19 +1,23 @@
 package pl.rmalinowski.adhocmanager.model;
 
+import java.util.List;
+
 public class RoutingTableEntry {
 	
 	private Node destinationNode;
 	private Integer hopCount;
 	private String nextHopAddress;
-	private Boolean valid;
-	private Long timeout;
+	private Long validTimestamp;
 	private Integer sequenceNumber;
+	private List<String> precursors;
+//	private Boolean sequenceNumberValid;
+	private RoutingTableEntryState state;
 	
 	public RoutingTableEntry(Node destinationNode) {
 		super();
 		this.destinationNode = destinationNode;
-		this.sequenceNumber = 0;
-		this.valid = false;
+//		this.sq
+		this.state = RoutingTableEntryState.INVALID;
 	}
 	public Node getDestinationNode() {
 		return destinationNode;
@@ -33,17 +37,11 @@ public class RoutingTableEntry {
 	public void setNextHopAddress(String nextHopAddress) {
 		this.nextHopAddress = nextHopAddress;
 	}
-	public Boolean isValid() {
-		return valid;
+	public Long getValidTimestamp() {
+		return validTimestamp;
 	}
-	public void setValid(Boolean isValid) {
-		this.valid = isValid;
-	}
-	public Long getTimeout() {
-		return timeout;
-	}
-	public void setTimeout(Long timeout) {
-		this.timeout = timeout;
+	public void setValidTimestamp(Long validTimestamp) {
+		this.validTimestamp = validTimestamp;
 	}
 	public Integer getSequenceNumber() {
 		return sequenceNumber;
@@ -51,5 +49,24 @@ public class RoutingTableEntry {
 	public void setSequenceNumber(Integer sequenceNumber) {
 		this.sequenceNumber = sequenceNumber;
 	}
+	public List<String> getPrecursors() {
+		return precursors;
+	}
+	public void setPrecursors(List<String> precursors) {
+		this.precursors = precursors;
+	}
+//	public Boolean getSequenceNumberValid() {
+//		return sequenceNumberValid;
+//	}
+//	public void setSequenceNumberValid(Boolean sequenceNumberValid) {
+//		this.sequenceNumberValid = sequenceNumberValid;
+//	}
+	public RoutingTableEntryState getState() {
+		return state;
+	}
+	public void setState(RoutingTableEntryState state) {
+		this.state = state;
+	}
+	
 
 }
