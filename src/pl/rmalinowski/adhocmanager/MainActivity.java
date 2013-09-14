@@ -22,6 +22,9 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 	private Button bluetoothButton;
 	private Button connectButton;
 	private Button sendButton;
+	private Button testButton1;
+	private Button testButton2;
+	private Button testButton3;
 	private Button exitButton;
 
 	@Override
@@ -44,6 +47,9 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		bluetoothButton = (Button) findViewById(R.id.main_button_bluetooth);
 		connectButton = (Button) findViewById(R.id.main_connect_button);
 		sendButton = (Button) findViewById(R.id.main_send_button);
+		testButton1 = (Button) findViewById(R.id.main_test_1);
+		testButton2 = (Button) findViewById(R.id.main_test_2);
+		testButton3 = (Button) findViewById(R.id.main_test_3);
 		exitButton = (Button) findViewById(R.id.main_exit_button);
 	}
 
@@ -52,6 +58,9 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		bluetoothButton.setOnClickListener(this);
 		connectButton.setOnClickListener(this);
 		sendButton.setOnClickListener(this);
+		testButton1.setOnClickListener(this);
+		testButton2.setOnClickListener(this);
+		testButton3.setOnClickListener(this);
 		exitButton.setOnClickListener(this);
 	}
 
@@ -98,6 +107,15 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		case R.id.main_send_button:
 			networkService.sendBroadcastData("dziala");
 			break;
+		case R.id.main_test_1:
+			networkService.test1();
+			break;
+		case R.id.main_test_2:
+			networkService.test2();
+			break;
+		case R.id.main_test_3:
+			networkService.test3();
+			break;
 		default:
 			break;
 		}
@@ -137,7 +155,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			startActivity(discoverableIntent);
 		}
 	}
-	
+
 	@Override
 	protected void onDestroy() {
 		stopService(new Intent(this, AodvService.class));

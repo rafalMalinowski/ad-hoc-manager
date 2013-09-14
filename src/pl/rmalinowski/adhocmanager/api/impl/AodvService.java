@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -15,14 +16,13 @@ import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEventType;
 import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
 import pl.rmalinowski.adhocmanager.exceptions.BadAddressException;
+import pl.rmalinowski.adhocmanager.model.ErrorNode;
 import pl.rmalinowski.adhocmanager.model.Node;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntryState;
 import pl.rmalinowski.adhocmanager.model.packets.DataPacket;
-import pl.rmalinowski.adhocmanager.model.packets.HelloMessage;
 import pl.rmalinowski.adhocmanager.model.packets.Packet;
 import pl.rmalinowski.adhocmanager.model.packets.RERRMessage;
-import pl.rmalinowski.adhocmanager.model.packets.RREPAckMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RREPMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RREQMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RoutingPacket;
@@ -50,7 +50,7 @@ public class AodvService extends NetworkLayerService {
 	private NodeDao nodeDao;
 	private volatile Integer nodeSequenceNumber;
 	private volatile Integer rreqMessageId;
-	private Map<Integer, Long> recentlyRecievedRreqMessagesTimestamps;
+	private Map<String, Long> recentlyRecievedRreqMessagesTimestamps;
 
 	@Override
 	public void onCreate() {
@@ -62,10 +62,10 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private void initializeNetworkLayer() {
-		nodeSequenceNumber = 0;
-		rreqMessageId = 0;
+		nodeSequenceNumber = 1;
+		rreqMessageId = 1;
 		dataPacketsQueues = new HashMap<String, LinkedList<DataPacket>>();
-		recentlyRecievedRreqMessagesTimestamps = new HashMap<Integer, Long>();
+		recentlyRecievedRreqMessagesTimestamps = new HashMap<String, Long>();
 		initializeRoutingTable();
 	}
 
@@ -88,8 +88,12 @@ public class AodvService extends NetworkLayerService {
 			// wyslij wiadomosc
 			physicalService.sendPacket(new DataPacket(data), address);
 			// zaktualizuj dane o wezle docelowym
-			// TODO czy aby na pewno?? sprawdzic
-			nodeIsValidUpdate(address);
+			validateRoutingTableEntry(address);
+			// jesli nie jest sasiadem, zaktualizuj takze informacje o nastepnym
+			// skoku
+			if (!nodeIsNeighbour(entry)) {
+				validateRoutingTableEntry(entry.getNextHopAddress());
+			}
 			break;
 		// jesli jest nieaktualny
 		case INVALID:
@@ -136,6 +140,7 @@ public class AodvService extends NetworkLayerService {
 			entry.setState(RoutingTableEntryState.VALID);
 			entry.setHopCount(1);
 			entry.setNextHopAddress(address);
+			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
 			break;
 		case PHYSICAL_LAYER_INITIALIZED:
 			initializeNetworkLayer();
@@ -153,9 +158,30 @@ public class AodvService extends NetworkLayerService {
 			routingTable.add(newEntry);
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "dodano nowy wezel"));
 			break;
+		case CONNECTION_TO_NEIGHBOUR_LOST:
+			String addressOfLostedNeighbour = (String) event.getData();
+			handleNeighbourLost(addressOfLostedNeighbour);
 		default:
 			break;
 		}
+	}
+
+	@Override
+	public void test1() {
+		Log.d(TAG, "test1");
+		RoutingTableEntry entry = routingTable.get(0);
+		RREQMessage rreqMessage = generateRREQMessage(entry);
+		physicalService.sendPacket(rreqMessage, entry.getNextHopAddress());
+	}
+
+	@Override
+	public void test2() {
+		Log.d(TAG, "test2");
+	}
+
+	@Override
+	public void test3() {
+		Log.d(TAG, "test3");
 	}
 
 	private void handleRecievedPacket(Packet packet) {
@@ -172,11 +198,11 @@ public class AodvService extends NetworkLayerService {
 			// wyslij informacje do wyzszych warstw
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.DATA_RECIEVED, dataPacket.getData()));
 			// zaktualizuj dane o wezle ktory wyslal wiadomosc
-			nodeIsValidUpdate(dataPacket.getSourceAddress());
+			validateRoutingTableEntry(dataPacket.getSourceAddress());
 			// jezeli sasiad od ktorego otrzymano wiadomosc nie jest nadawca
 			// zaktualizuj dane takze o nim
-			if (!dataPacket.getSourceAddress().equals(dataPacket.getInterfaceAddress())) {
-				nodeIsValidUpdate(dataPacket.getInterfaceAddress());
+			if (!nodeIsNeighbour(dataPacket.getSourceAddress())) {
+				validateRoutingTableEntry(dataPacket.getInterfaceAddress());
 			}
 		} // jezeli wezel nie jest adresatem wiadomosci
 		else {
@@ -188,22 +214,30 @@ public class AodvService extends NetworkLayerService {
 				physicalService.sendPacket(dataPacket, destinationEntry.getNextHopAddress());
 				// nastepnie zaktualizuj informacje o wezle ktory wyslal
 				// wiadomosc
-				nodeIsValidUpdate(dataPacket.getSourceAddress());
+				validateRoutingTableEntry(dataPacket.getSourceAddress());
 				// jezeli sasiad od ktorego otrzymano wiadomosc nie jest nadawca
 				// zaktualizuj dane takze o nim
-				if (!dataPacket.getSourceAddress().equals(dataPacket.getInterfaceAddress())) {
-					nodeIsValidUpdate(dataPacket.getInterfaceAddress());
+				if (!nodeIsNeighbour(dataPacket.getSourceAddress())) {
+					validateRoutingTableEntry(dataPacket.getInterfaceAddress());
 				}
 				// zaktualizuj takze informacje o adresacie
-				nodeIsValidUpdate(dataPacket.getDestinationAddress());
+				validateRoutingTableEntry(dataPacket.getDestinationAddress());
 				// jezeli wezel do ktorego przekazywana jest wiadomosc nie jest
 				// adresatem, zaktualizuj takze dane o nim
-				if (!dataPacket.getDestinationAddress().equals(destinationEntry.getNextHopAddress())) {
-					nodeIsValidUpdate(destinationEntry.getNextHopAddress());
+				if (!nodeIsNeighbour(dataPacket.getDestinationAddress())) {
+					validateRoutingTableEntry(destinationEntry.getNextHopAddress());
 				}
 			} // inaczej trzeba wyslac wiadomosc RERR
 			else {
-				// TODO obsluzyc wiadomosci RERR
+				invalidateRoutingTableEntry(destinationEntry);
+				RERRMessage rerrMessage = new RERRMessage();
+				ErrorNode errorNode = new ErrorNode();
+				errorNode.setAddress(destinationEntry.getDestinationNode().getAddress());
+				errorNode.setSequenceNumber(destinationEntry.getSequenceNumber());
+				Set<ErrorNode> errorNodesSet = new HashSet<ErrorNode>();
+				errorNodesSet.add(errorNode);
+				rerrMessage.setUnreachableNodes(errorNodesSet);
+				physicalService.sendPacket(rerrMessage, dataPacket.getInterfaceAddress());
 			}
 		}
 	}
@@ -215,29 +249,68 @@ public class AodvService extends NetworkLayerService {
 			handleRREQMessage((RREQMessage) message);
 		} else if (message instanceof RREPMessage) {
 			handleRREPMessage((RREPMessage) message);
-		} else if (message instanceof RREPAckMessage) {
-			handleRREPAckMessage((RREPAckMessage) message);
-		} else if (message instanceof HelloMessage) {
-			handleHelloMessage((HelloMessage) message);
 		}
 	}
 
 	private void handleRERRMessage(RERRMessage message) {
 
+		// TODO obsluzyc wiadomosc ERROR
+
+	}
+
+	private void handleNeighbourLost(String address) {
+		Set<RoutingTableEntry> nodesNotAccessibleAnymore = findNodesWhichWasAccessedThroughNeighbour(address);
+		Set<String> affectedPrecursors = new HashSet<String>();
+		for (RoutingTableEntry entry : nodesNotAccessibleAnymore) {
+			affectedPrecursors.addAll(entry.getPrecursors());
+			invalidateRoutingTableEntry(entry);
+		}
+		Set<String> addressesOfNeighboursWhichHaveToBeInformed = findNextHopsWhichLeadsToNodesAffectedByBrokenLink(affectedPrecursors);
+
+		RERRMessage rerrMessage = new RERRMessage();
+		Set<ErrorNode> unreachableNodes = new HashSet<ErrorNode>();
+		for (RoutingTableEntry entry : nodesNotAccessibleAnymore) {
+			ErrorNode errorNode = new ErrorNode();
+			errorNode.setAddress(entry.getDestinationNode().getAddress());
+			// numer zostal juz wczesniej zwiekszony
+			errorNode.setSequenceNumber(entry.getSequenceNumber());
+		}
+		rerrMessage.setUnreachableNodes(unreachableNodes);
+
+		for (String addressOfNode : addressesOfNeighboursWhichHaveToBeInformed) {
+			physicalService.sendPacket(rerrMessage, addressOfNode);
+		}
+	}
+
+	private Set<RoutingTableEntry> findNodesWhichWasAccessedThroughNeighbour(String address) {
+		Set<RoutingTableEntry> affectedNodes = new HashSet<RoutingTableEntry>();
+		for (RoutingTableEntry entry : routingTable) {
+			if (address.equals(entry.getNextHopAddress())) {
+				affectedNodes.add(entry);
+			}
+		}
+		// takze trzeba umiescic wezel ktory sie popsul
+		affectedNodes.add(findRoutingTableEntryForAddress(address));
+		return affectedNodes;
+	}
+
+	private Set<String> findNextHopsWhichLeadsToNodesAffectedByBrokenLink(Set<String> affectedNodes) {
+		Set<String> resultSet = new HashSet<String>();
+
+		for (String address : affectedNodes) {
+			resultSet.add(findRoutingTableEntryForAddress(address).getNextHopAddress());
+		}
+		return resultSet;
 	}
 
 	private void handleRREQMessage(RREQMessage message) {
-		// TODO zaktualizuj numer sekwencyjny wezla od ktorego dostalej
-		// wiadomosc - nie rozumiem jeszcze o co chodzi
 
-		// jesli parametr TTL wiadomosci wymosi 1 lub mniej to nic nie rob
-		if (message.getTtl() <= 1) {
-			return;
-		}
+		// zaktualizuje informacje o wezle od ktorego dostales wiadomosc
+		validateRoutingTableEntry(message.getInterfaceAddress());
 
 		// sprawdz czy dostales juz RREQ o podanym id
-		if (recentlyRecievedRreqMessagesTimestamps.containsKey(message.getId())) {
-			long lastRreqMessageTimestamp = recentlyRecievedRreqMessagesTimestamps.get(message.getId());
+		if (recentlyRecievedRreqMessagesTimestamps.containsKey(message.getId() + "_" + message.getOriginAddress())) {
+			long lastRreqMessageTimestamp = recentlyRecievedRreqMessagesTimestamps.get(message.getId() + "_" + message.getOriginAddress());
 			// jesli dana wiadomosc byla uzyskana niedawno to przerwij dalsze
 			// wywolywanie metody
 			if (new Date().getTime() < (lastRreqMessageTimestamp + AodvContants.PATH_DISCOVERY_TIME)) {
@@ -245,59 +318,145 @@ public class AodvService extends NetworkLayerService {
 			}
 		} // w innym przypadku dodaj do mapy odpowiedni wpis
 		else {
-			recentlyRecievedRreqMessagesTimestamps.put(message.getId(), new Date().getTime());
+			recentlyRecievedRreqMessagesTimestamps.put(message.getId() + "_" + message.getOriginAddress(), new Date().getTime());
 		}
 		// inkrementuj liczbe skokow
 		message.setHopCount(message.getHopCount() + 1);
 
+		// zaktualizuj sciezke do nadawcy
 		RoutingTableEntry sourceEntry = findRoutingTableEntryForAddress(message.getOriginAddress());
-		// zaktualizuj sciezke do nadawcy jesli nie jest to bezposredni sasiad
-		if (!sourceEntry.getDestinationNode().getAddress().equals(sourceEntry.getNextHopAddress())) {
-			// jesli numer sekwencjny przeslany w wiadomosci jest wiekszy niz
-			// ten w tablicy, nalezy zakutalizowac wpis w tablicy
-			if (message.getOriginSeq() > sourceEntry.getSequenceNumber()) {
-				sourceEntry.setSequenceNumber(message.getOriginSeq());
-			}
-			// zaktualizuj pola w tabeli rutingowej
-			sourceEntry.setNextHopAddress(message.getInterfaceAddress());
-			sourceEntry.setHopCount(message.getHopCount());
-			nodeIsValidUpdate(sourceEntry);
+
+		// jesli numer sekwencjny przeslany w wiadomosci jest wiekszy niz
+		// ten w tablicy, nalezy zakutalizowac wpis w tablicy
+		if (message.getOriginSeq() > sourceEntry.getSequenceNumber()) {
+			sourceEntry.setSequenceNumber(message.getOriginSeq());
 		}
+		// zaktualizuj inne pola w tabeli rutingowej
+		sourceEntry.setValidSequenceNumber(true);
+		sourceEntry.setNextHopAddress(message.getInterfaceAddress());
+		sourceEntry.setHopCount(message.getHopCount());
+		validateRoutingTableEntry(sourceEntry);
 
-		RoutingTableEntry destinationEntry = findRoutingTableEntryForAddress(message.getDestinationAddress());
-		// aktualizujemy status wpisu w tablicy rutingowej dotyczacy wpisu
-		// docelowego
-		RoutingTableEntryState destinationEntryState = checkNodeValidity(destinationEntry);
-		switch (checkNodeValidity(destinationEntry)) {
-		case VALID:
-
-			break;
-		// wezel nie zna sciezki, wiec przesyla wiadomosci RREQ dalej
-		case INVALID:
-		case VALIDATING:
-			// jesli seqN w tablicy rutingowej jest wiekszy niz w wiadomosci,
-			// nastepuje update
-			if (destinationEntry.getSequenceNumber() > message.getDestinationSeq()) {
-				message.setDestinationSeq(destinationEntry.getSequenceNumber());
+		// jesli dany wezel jest wezlem docelowym to wyslij odpowiedz
+		if (physicalService.getLocalAddress().equals(message.getDestinationAddress())) {
+			// wygeneruj wiadomosc RREP
+			RREPMessage rrepMessage = generateRrepMessageAsDestination(message);
+			// odeslij pakiet RREP spowrotem droga ktora przyszedl
+			physicalService.sendPacket(rrepMessage, message.getInterfaceAddress());
+		} else {
+			RoutingTableEntry destinationEntry = findRoutingTableEntryForAddress(message.getDestinationAddress());
+			// aktualizujemy status wpisu w tablicy rutingowej dotyczacy wezla
+			// docelowego
+			RoutingTableEntryState destinationEntryState = checkNodeValidity(destinationEntry);
+			// jesli wezel zna sciezke do wezla docelowego, jest aktualna i nie
+			// jest ustawiona flaga D
+			if (RoutingTableEntryState.VALID == destinationEntryState && destinationEntry.getSequenceNumber() >= message.getDestinationSeq()
+					&& !message.getFlagD()) {
+				// wygeneruj wiadomosc RREP
+				RREPMessage rrepMessage = generateRrepMessageAsIntermediateNode(message);
+				// odeslij pakiet RREP spowrotem droga ktora przyszedl
+				physicalService.sendPacket(rrepMessage, message.getInterfaceAddress());
+				// jesli w wiadomosci RREQ byla ustawiona flaga G, nalezy dalej
+				// wyslac wiadomosc Gratuitous RREP
+				if (message.getFlagG()) {
+					RREPMessage gratuitousRrepMessage = generateGratuitousRREP(message);
+					String gratuitousMessageDestinationAddress = findRoutingTableEntryForAddress(message.getDestinationAddress()).getNextHopAddress();
+					physicalService.sendPacket(gratuitousRrepMessage, gratuitousMessageDestinationAddress);
+				}
+			} else {
+				// jesli seqN w tablicy rutingowej jest wiekszy niz w
+				// wiadomosci, nastepuje update w wiadomosci
+				if (destinationEntry.getSequenceNumber() > message.getDestinationSeq()) {
+					message.setDestinationSeq(destinationEntry.getSequenceNumber());
+				}
+				// przeslij broadcast dalej do wszystkich wezlow oprocz wezla od
+				// ktorego dostales wiadomosc RREQ
+				if (message.getTtl() > 1) {
+					physicalService.sendPacketBroadcastExceptOneAddress(message, message.getInterfaceAddress());
+				}
 			}
-			 physicalService.sendPacketBroadcast(message);
-			break;
-		default:
-			break;
 		}
-
 	}
 
 	private void handleRREPMessage(RREPMessage message) {
 
+		// zaktualizuje informacje o wezle od ktorego dostales wiadomosc
+		validateRoutingTableEntry(message.getInterfaceAddress());
+
+		message.setHopCount(message.getHopCount() + 1);
+		RoutingTableEntry destinationEntry = findRoutingTableEntryForAddress(message.getDestinationAddress());
+		// TODO koniecznie przetestowac
+		// jezeli te warunki sa spelnione, nalezy zaktualizowac wpis dotyczacy
+		// wezla ktorego dotyczy przekazywana dalej wiadomosc RREP
+		if (!destinationEntry.getValidSequenceNumber()
+				|| message.getDestinationSeq() > destinationEntry.getSequenceNumber()
+				|| (message.getDestinationSeq().equals(destinationEntry.getSequenceNumber()) && (!destinationEntry.getState().equals(
+						RoutingTableEntryState.VALID) || message.getHopCount() < destinationEntry.getHopCount()))) {
+			validateRoutingTableEntry(destinationEntry);
+			destinationEntry.setState(RoutingTableEntryState.VALID);
+			destinationEntry.setValidSequenceNumber(true);
+			destinationEntry.setNextHopAddress(message.getInterfaceAddress());
+			destinationEntry.setSequenceNumber(message.getDestinationSeq());
+		}
+		// nalezy przekazac wiadomosc dalej
+		if (!message.getOriginAddress().equals(physicalService.getLocalAddress())) {
+			RoutingTableEntry originatorEntry = findRoutingTableEntryForAddress(message.getOriginAddress());
+			physicalService.sendPacket(message, originatorEntry.getNextHopAddress());
+
+			// aktualizacja adresow
+			destinationEntry.getPrecursors().add(originatorEntry.getNextHopAddress());
+			originatorEntry.getPrecursors().add(destinationEntry.getNextHopAddress());
+		} // jezeli dany wezel jest wezlem ktory wyslal wiadomosc RREQ, nalezy
+			// wyslac zalegle pakiety z danymi
+		else {
+			if (dataPacketsQueues.containsKey(message.getDestinationAddress())) {
+				LinkedList<DataPacket> packetsQueue = dataPacketsQueues.get(message.getDestinationAddress());
+				while (!packetsQueue.isEmpty()) {
+					DataPacket packetToSend = packetsQueue.peekFirst();
+					physicalService.sendPacket(packetToSend, destinationEntry.getNextHopAddress());
+				}
+			}
+		}
 	}
 
-	private void handleRREPAckMessage(RREPAckMessage message) {
+	private RREPMessage generateRrepMessageAsIntermediateNode(RREQMessage message) {
+		RoutingTableEntry destinationEntry = findRoutingTableEntryForAddress(message.getDestinationAddress());
+		RREPMessage rrepMessage = new RREPMessage();
 
+		rrepMessage.setDestinationSeq(destinationEntry.getSequenceNumber());
+
+		destinationEntry.getPrecursors().add(message.getInterfaceAddress());
+		RoutingTableEntry originationEntry = findRoutingTableEntryForAddress(message.getOriginAddress());
+		originationEntry.getPrecursors().add(destinationEntry.getNextHopAddress());
+
+		rrepMessage.setOriginAddress(message.getOriginAddress());
+		rrepMessage.setHopCount(destinationEntry.getHopCount());
+		rrepMessage.setDestinationAddress(message.getDestinationAddress());
+		return rrepMessage;
 	}
 
-	private void handleHelloMessage(HelloMessage message) {
+	private RREPMessage generateRrepMessageAsDestination(RREQMessage message) {
+		// inkrementuj wlasny sequence number jezeli seqNb w wiadomosci wiekszy
+		// od twojego
+		if (message.getDestinationSeq() > nodeSequenceNumber) {
+			nodeSequenceNumber++;
+		}
+		RREPMessage rrepMessage = new RREPMessage();
+		rrepMessage.setDestinationSeq(nodeSequenceNumber);
+		rrepMessage.setOriginAddress(message.getOriginAddress());
+		rrepMessage.setHopCount(0);
+		rrepMessage.setDestinationAddress(message.getDestinationAddress());
+		return rrepMessage;
+	}
 
+	private RREPMessage generateGratuitousRREP(RREQMessage message) {
+		RoutingTableEntry sourceEntry = findRoutingTableEntryForAddress(message.getOriginAddress());
+		RREPMessage rrepMessage = new RREPMessage();
+		rrepMessage.setHopCount(sourceEntry.getHopCount());
+		rrepMessage.setDestinationAddress(message.getOriginAddress());
+		rrepMessage.setDestinationSeq(message.getOriginSeq());
+		rrepMessage.setOriginAddress(message.getDestinationAddress());
+		return rrepMessage;
 	}
 
 	private synchronized RREQMessage generateRREQMessage(RoutingTableEntry entry) {
@@ -309,6 +468,7 @@ public class AodvService extends NetworkLayerService {
 		} // w innym przypadku nie ustawiaj go i dodaj flage U
 		else {
 			rreqMessage.setFlagU(true);
+			rreqMessage.setDestinationSeq(0);
 		}
 		rreqMessage.setDestinationAddress(entry.getDestinationNode().getAddress());
 		rreqMessage.setOriginAddress(physicalService.getLocalAddress());
@@ -317,6 +477,9 @@ public class AodvService extends NetworkLayerService {
 		rreqMessage.setHopCount(0);
 		// wartosc na sztywno zapisana w constantsach
 		rreqMessage.setFlagG(AodvContants.DEFAULT_G_FLAG_IN_RREQ_VALUE);
+
+		// wstaw do tabeli, tak aby nie odpowiadac na wlasne wiadomosci RREQ
+		recentlyRecievedRreqMessagesTimestamps.put(rreqMessageId + "_" + physicalService.getLocalAddress(), new Date().getTime());
 		return rreqMessage;
 	}
 
@@ -352,20 +515,56 @@ public class AodvService extends NetworkLayerService {
 			// jesli nie udalo sie znalezc sciezki trzeba poinformowac warstwe
 			// aplikacyjna
 			if (!routeEstablished) {
+				// ustaw wezel jako nieaktywny
 				entry.setState(RoutingTableEntryState.INVALID);
+				// wyczysc kolejke pakietow
+				dataPacketsQueues.get(entry).clear();
 				sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.DESTINATION_UNREACHABLE, entry.getDestinationNode().getAddress()));
 			}
 		}
 	}
 
-	private void nodeIsValidUpdate(String address) {
+	private void validateRoutingTableEntry(String address) {
 		RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
-		nodeIsValidUpdate(entry);
+		validateRoutingTableEntry(entry);
 	}
 
-	private void nodeIsValidUpdate(RoutingTableEntry entry) {
+	private void validateRoutingTableEntry(RoutingTableEntry entry) {
 		entry.setState(RoutingTableEntryState.VALID);
-		entry.setValidTimestamp(new Date().getTime() + AodvContants.ACTIVE_ROUTE_TIMEOUT);
+		if (nodeIsNeighbour(entry)) {
+			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
+		} else {
+			entry.setValidTimestamp(new Date().getTime() + AodvContants.ACTIVE_ROUTE_TIMEOUT);
+		}
+	}
+
+	private void invalidateRoutingTableEntry(String address) {
+		RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
+		invalidateRoutingTableEntry(entry);
+	}
+
+	private void invalidateRoutingTableEntry(RoutingTableEntry entry) {
+		entry.setState(RoutingTableEntryState.INVALID);
+		if (nodeIsNeighbour(entry)) {
+			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
+		} else {
+			entry.setValidTimestamp(new Date().getTime() + AodvContants.ACTIVE_ROUTE_TIMEOUT);
+		}
+		// zwieksz numer sekwencyjny o 1
+		entry.setSequenceNumber(entry.getSequenceNumber() + 1);
+	}
+
+	private boolean nodeIsNeighbour(RoutingTableEntry entry) {
+		if (entry.getDestinationNode().getAddress().equals(entry)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private boolean nodeIsNeighbour(String address) {
+		RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
+		return nodeIsNeighbour(entry);
 	}
 
 	private RoutingTableEntryState checkNodeValidity(String address) {

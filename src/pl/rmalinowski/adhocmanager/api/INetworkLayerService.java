@@ -17,4 +17,10 @@ public interface INetworkLayerService{
 	
 	public List<String> getNodes();
 	
+	public void test1();
+
+	public void test2();
+
+	public void test3();
+	
 }

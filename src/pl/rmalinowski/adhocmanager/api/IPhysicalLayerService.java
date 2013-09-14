@@ -20,4 +20,6 @@ public interface IPhysicalLayerService {
 	public Set<Node> getConnectedDevices();
 	
 	public String getLocalAddress();
+	
+	public void sendPacketBroadcastExceptOneAddress(Packet packet, String address);
 }

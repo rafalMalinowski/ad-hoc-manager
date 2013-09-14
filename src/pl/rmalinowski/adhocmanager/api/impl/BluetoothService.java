@@ -81,23 +81,31 @@ public class BluetoothService extends PhysicalLayerService {
 	public void sendPacket(Packet packet, String destination) {
 		if (connectedDevices.containsKey(destination)) {
 			// przed wyslaniem pakietu istaw interfejs i dekrementuj pole TTL
-			if (packet.getTtl() != null){
+			if (packet.getTtl() != null) {
 				packet.setTtl(packet.getTtl() - 1);
 			} else {
 				packet.setTtl(AodvContants.TTL_VALUE);
 			}
 			packet.setInterfaceAddress(bluetoothAdapter.getAddress());
-			
+
 			connectedDevices.get(destination).send(packet);
 		}
 	}
-	
+
 	@Override
 	public void sendPacketBroadcast(Packet packet) {
-		for (ActiveConnectionThread thread : connectedDevices.values()){
+		for (ActiveConnectionThread thread : connectedDevices.values()) {
 			thread.send(packet);
 		}
-		
+	}
+
+	@Override
+	public void sendPacketBroadcastExceptOneAddress(Packet packet, String address) {
+		for (ActiveConnectionThread thread : connectedDevices.values()) {
+			if (!address.equals(thread.getBlueSocket().getRemoteDevice().getAddress())) {
+				thread.send(packet);
+			}
+		}
 	}
 
 	@Override
@@ -358,6 +366,10 @@ public class BluetoothService extends PhysicalLayerService {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+
+		public BluetoothSocket getBlueSocket() {
+			return blueSocket;
 		}
 	}
 
