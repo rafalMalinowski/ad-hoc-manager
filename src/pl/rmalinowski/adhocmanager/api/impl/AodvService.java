@@ -45,7 +45,7 @@ public class AodvService extends NetworkLayerService {
 	private final IBinder mBinder = new MyBinder();
 
 	private PhysicalLayerService physicalService;
-	private List<RoutingTableEntry> routingTable;
+	private Set<RoutingTableEntry> routingTable;
 	private volatile Map<String, LinkedList<DataPacket>> dataPacketsQueues;
 	private NodeDao nodeDao;
 	private volatile Integer nodeSequenceNumber;
@@ -54,11 +54,13 @@ public class AodvService extends NetworkLayerService {
 
 	@Override
 	public void onCreate() {
-		super.onCreate();
 		bindService(new Intent(this, BluetoothService.class), mConnection, Context.BIND_AUTO_CREATE);
+		// bindService(new Intent(this, WiFiDirectService.class), mConnection,
+		// Context.BIND_AUTO_CREATE);
 		registerBroadcastRecievers();
 		nodeDao = new NodeDao(this);
 		nodeDao.open();
+		super.onCreate();
 	}
 
 	private void initializeNetworkLayer() {
@@ -70,7 +72,7 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private void initializeRoutingTable() {
-		routingTable = new ArrayList<RoutingTableEntry>();
+		routingTable = new HashSet<RoutingTableEntry>();
 		Set<Node> nodes = nodeDao.getAllNodes();
 		for (Node node : nodes) {
 			RoutingTableEntry entry = new RoutingTableEntry(node);
@@ -79,20 +81,25 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	@Override
-	public void sendData(Serializable data, String address) {
-		RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
+	public void sendData(Serializable data, String destinationAddress) {
+		RoutingTableEntry entry = findRoutingTableEntryForAddress(destinationAddress);
 		RoutingTableEntryState entryState = checkNodeValidity(entry);
+
+		DataPacket packet = new DataPacket(data);
+		packet.setDestinationAddress(destinationAddress);
+		packet.setSourceAddress(physicalService.getLocalAddress());
+		String nextHopAddress = entry.getNextHopAddress();
 		switch (entryState) {
 		// jesli wpis o wezle docelowym jest aktualny
 		case VALID:
-			// wyslij wiadomosc
-			physicalService.sendPacket(new DataPacket(data), address);
+			// wyslij wiadomosc do warstwy fizycznej
+			physicalService.sendPacket(packet, nextHopAddress);
 			// zaktualizuj dane o wezle docelowym
-			validateRoutingTableEntry(address);
+			validateRoutingTableEntry(destinationAddress);
 			// jesli nie jest sasiadem, zaktualizuj takze informacje o nastepnym
 			// skoku
 			if (!nodeIsNeighbour(entry)) {
-				validateRoutingTableEntry(entry.getNextHopAddress());
+				validateRoutingTableEntry(nextHopAddress);
 			}
 			break;
 		// jesli jest nieaktualny
@@ -103,29 +110,29 @@ public class AodvService extends NetworkLayerService {
 			RreqMessageSenderThread rreqMessageSender = new RreqMessageSenderThread(entry);
 			rreqMessageSender.start();
 			// dodaj pakiety do kolejnki oczekujacej na wyslanie
-			addDataPacketToWaitingQueue(new DataPacket(data), address);
+			addDataPacketToWaitingQueue(packet);
 			// ustaw status wezla na walidowany
 			entry.setState(RoutingTableEntryState.VALIDATING);
 			break;
 		// jesli juz zostaly wyslane wiadomosci typu RREQ
 		case VALIDATING:
 			// dodaj pakiety do kolejnki oczekujacej na wyslanie
-			addDataPacketToWaitingQueue(new DataPacket(data), address);
+			addDataPacketToWaitingQueue(packet);
 			break;
 		default:
 			break;
 		}
 	}
 
-	private void addDataPacketToWaitingQueue(DataPacket packet, String address) {
+	private void addDataPacketToWaitingQueue(DataPacket packet) {
 		// jezeli kolejka juz istnieje dodaj element
-		if (dataPacketsQueues.containsKey(address)) {
-			dataPacketsQueues.get(address).addLast(packet);
+		if (dataPacketsQueues.containsKey(packet.getDestinationAddress())) {
+			dataPacketsQueues.get(packet.getDestinationAddress()).addLast(packet);
 		} // jezeli kolejka nie istnieje, stworz ja i dodaj element
 		else {
 			LinkedList<DataPacket> list = new LinkedList<DataPacket>();
 			list.addLast(packet);
-			dataPacketsQueues.put(address, list);
+			dataPacketsQueues.put(packet.getDestinationAddress(), list);
 		}
 	}
 
@@ -141,10 +148,11 @@ public class AodvService extends NetworkLayerService {
 			entry.setHopCount(1);
 			entry.setNextHopAddress(address);
 			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Podlaczono do sasiada"));
 			break;
 		case PHYSICAL_LAYER_INITIALIZED:
 			initializeNetworkLayer();
-			physicalService.connectToNeighbours();
+			// physicalService.connectToNeighbours();
 			break;
 		case CONNECTING_TO_NEIGHBOURS_FINISHED:
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "uruchomiono wartswe fizyczna"));
@@ -161,6 +169,9 @@ public class AodvService extends NetworkLayerService {
 		case CONNECTION_TO_NEIGHBOUR_LOST:
 			String addressOfLostedNeighbour = (String) event.getData();
 			handleNeighbourLost(addressOfLostedNeighbour);
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Utracono polaczenie do sasiada"));
+		case CONNECTION_TO_NEIGHBOUR_NOT_ESTABLISHED:
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Nie udalo sie nawiazac polaczenia do sasiada"));
 		default:
 			break;
 		}
@@ -169,13 +180,17 @@ public class AodvService extends NetworkLayerService {
 	@Override
 	public void test1() {
 		Log.d(TAG, "test1");
-		RoutingTableEntry entry = routingTable.get(0);
-		RREQMessage rreqMessage = generateRREQMessage(entry);
-		physicalService.sendPacket(rreqMessage, entry.getNextHopAddress());
+		// RoutingTableEntry entry = routingTable.get(0);
+		// RREQMessage rreqMessage = generateRREQMessage(entry);
+		// physicalService.sendPacket(rreqMessage, entry.getNextHopAddress());
 	}
 
 	@Override
 	public void test2() {
+		Set<Node> nodes = nodeDao.getAllNodes();
+		for (Node node : nodes) {
+			nodeDao.delete(node.getId());
+		}
 		Log.d(TAG, "test2");
 	}
 
@@ -254,16 +269,30 @@ public class AodvService extends NetworkLayerService {
 
 	private void handleRERRMessage(RERRMessage message) {
 
-		// TODO obsluzyc wiadomosc ERROR
-
+		Set<ErrorNode> errorNodes = message.getUnreachableNodes();
+		Set<RoutingTableEntry> nodesNotAccessibleAnymore = new HashSet<RoutingTableEntry>();
+		for (ErrorNode errorNode : errorNodes) {
+			RoutingTableEntry entry = findRoutingTableEntryForAddress(errorNode.getAddress());
+			// jesli wpis z bledem byl dotad w tablicy routingu uznany za
+			// prawidlowy, nalezy go zmienic na nieprawidlowy
+			if (RoutingTableEntryState.VALID == entry.getState()) {
+				entry.setState(RoutingTableEntryState.INVALID);
+				entry.setSequenceNumber(errorNode.getSequenceNumber());
+			}
+			nodesNotAccessibleAnymore.add(entry);
+		}
+		determineAffectedNeighboursAndTransmitThemRerrMessage(nodesNotAccessibleAnymore);
 	}
 
 	private void handleNeighbourLost(String address) {
 		Set<RoutingTableEntry> nodesNotAccessibleAnymore = findNodesWhichWasAccessedThroughNeighbour(address);
+		determineAffectedNeighboursAndTransmitThemRerrMessage(nodesNotAccessibleAnymore);
+	}
+
+	private void determineAffectedNeighboursAndTransmitThemRerrMessage(Set<RoutingTableEntry> nodesNotAccessibleAnymore) {
 		Set<String> affectedPrecursors = new HashSet<String>();
 		for (RoutingTableEntry entry : nodesNotAccessibleAnymore) {
 			affectedPrecursors.addAll(entry.getPrecursors());
-			invalidateRoutingTableEntry(entry);
 		}
 		Set<String> addressesOfNeighboursWhichHaveToBeInformed = findNextHopsWhichLeadsToNodesAffectedByBrokenLink(affectedPrecursors);
 
@@ -287,6 +316,7 @@ public class AodvService extends NetworkLayerService {
 		for (RoutingTableEntry entry : routingTable) {
 			if (address.equals(entry.getNextHopAddress())) {
 				affectedNodes.add(entry);
+				invalidateRoutingTableEntry(entry);
 			}
 		}
 		// takze trzeba umiescic wezel ktory sie popsul
@@ -683,9 +713,14 @@ public class AodvService extends NetworkLayerService {
 	public void sendBroadcastData(Serializable data) {
 		for (RoutingTableEntry entry : routingTable) {
 			if (entry != null && RoutingTableEntryState.VALID == entry.getState()) {
-				physicalService.sendPacket(new DataPacket(data), entry.getDestinationNode().getAddress());
+				physicalService.sendPacket(new DataPacket(data), entry.getNextHopAddress());
 			}
 		}
+	}
+
+	@Override
+	public Set<RoutingTableEntry> getRoutingTable() {
+		return routingTable;
 	}
 
 }

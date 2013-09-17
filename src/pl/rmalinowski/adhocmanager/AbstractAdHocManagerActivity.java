@@ -26,9 +26,9 @@ public abstract class AbstractAdHocManagerActivity extends Activity{
 	
 	@Override
 	protected void onPause() {
-		super.onPause();
 		unregisterBroadcastRecievers();
 		unbindService(mConnection);
+		super.onPause();
 	}
 	
 	@Override
@@ -61,6 +61,7 @@ public abstract class AbstractAdHocManagerActivity extends Activity{
 
 		public void onServiceConnected(ComponentName className, IBinder binder) {
 			networkService = (NetworkLayerService) ((NetworkLayerService.MyBinder) binder).getService();
+			networkServiceBinded();
 		}
 
 		public void onServiceDisconnected(ComponentName className) {
@@ -69,4 +70,8 @@ public abstract class AbstractAdHocManagerActivity extends Activity{
 	};
 	
 	protected abstract void handleNetworkLayerEvent(NetworkLayerEvent event);
+	
+	protected void networkServiceBinded() {
+		
+	}
 }

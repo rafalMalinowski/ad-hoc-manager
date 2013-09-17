@@ -22,4 +22,9 @@ public interface IPhysicalLayerService {
 	public String getLocalAddress();
 	
 	public void sendPacketBroadcastExceptOneAddress(Packet packet, String address);
+	
+	public void connectToDevice(String address, int numberOfRetries);
+	
+	public void disconnectFromDevice(String address);
+	
 }

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
@@ -19,17 +20,19 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 	private static final int ADAPTED_DISABLED_BROADCAST_EVENT = 1;
 
 	private Button searchButton;
-	private Button bluetoothButton;
 	private Button connectButton;
 	private Button sendButton;
 	private Button testButton1;
 	private Button testButton2;
 	private Button testButton3;
 	private Button exitButton;
+	private Button discoverButton;
+	private Button deviceListButton;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		this.requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.activity_main);
 		initializeFields();
 		setListeners();
@@ -44,29 +47,32 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 
 	private void initializeFields() {
 		searchButton = (Button) findViewById(R.id.main_search_for_devices);
-		bluetoothButton = (Button) findViewById(R.id.main_button_bluetooth);
 		connectButton = (Button) findViewById(R.id.main_connect_button);
 		sendButton = (Button) findViewById(R.id.main_send_button);
 		testButton1 = (Button) findViewById(R.id.main_test_1);
 		testButton2 = (Button) findViewById(R.id.main_test_2);
 		testButton3 = (Button) findViewById(R.id.main_test_3);
 		exitButton = (Button) findViewById(R.id.main_exit_button);
+		discoverButton = (Button) findViewById(R.id.main_discovery);
+		deviceListButton = (Button) findViewById(R.id.main_list_devices);
 	}
 
 	private void setListeners() {
 		searchButton.setOnClickListener(this);
-		bluetoothButton.setOnClickListener(this);
 		connectButton.setOnClickListener(this);
 		sendButton.setOnClickListener(this);
 		testButton1.setOnClickListener(this);
 		testButton2.setOnClickListener(this);
 		testButton3.setOnClickListener(this);
 		exitButton.setOnClickListener(this);
+		discoverButton.setOnClickListener(this);
+		deviceListButton.setOnClickListener(this);
 	}
 
 	private void startServices() {
-		startService(new Intent(this, AodvService.class));
 		startService(new Intent(this, BluetoothService.class));
+		// startService(new Intent(this, WiFiDirectService.class));
+		startService(new Intent(this, AodvService.class));
 	}
 
 	protected void handleNetworkLayerEvent(NetworkLayerEvent event) {
@@ -95,9 +101,6 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			}
 			finish();
 			break;
-		case R.id.main_button_bluetooth:
-			startActivity(new Intent(this, BluetoothActivity.class));
-			break;
 		case R.id.main_search_for_devices:
 			networkService.searchForDevices();
 			break;
@@ -116,6 +119,10 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		case R.id.main_test_3:
 			networkService.test3();
 			break;
+		case R.id.main_discovery:
+			startActivity(new Intent(this, DiscoverActivity.class));
+		case R.id.main_list_devices:
+			startActivity(new Intent(this, RoutingTableActivity.class));
 		default:
 			break;
 		}

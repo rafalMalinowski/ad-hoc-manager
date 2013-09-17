@@ -17,21 +17,12 @@
         android:text="@string/search" />
 
     <Button
-        android:id="@+id/main_button_bluetooth"
+        android:id="@+id/main_connect_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/main_search_for_devices"
         android:layout_alignRight="@+id/main_search_for_devices"
         android:layout_below="@+id/main_search_for_devices"
-        android:text="@string/bluetooth" />
-
-    <Button
-        android:id="@+id/main_connect_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/main_button_bluetooth"
-        android:layout_alignRight="@+id/main_button_bluetooth"
-        android:layout_below="@+id/main_button_bluetooth"
         android:text="@string/connect" />
 
     <Button
@@ -78,5 +69,23 @@
         android:layout_alignRight="@+id/main_test_3"
         android:layout_below="@+id/main_test_3"
         android:text="@string/exit_button" />
+
+    <Button
+        android:id="@+id/main_discovery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/main_exit_button"
+        android:layout_alignRight="@+id/main_exit_button"
+        android:layout_below="@+id/main_exit_button"
+        android:text="@string/discover_devices" />
+
+    <Button
+        android:id="@+id/main_list_devices"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/main_discovery"
+        android:layout_alignRight="@+id/main_discovery"
+        android:layout_below="@+id/main_discovery"
+        android:text="@string/list_devices" />
 
 </RelativeLayout>

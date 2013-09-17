@@ -37,7 +37,7 @@ import android.util.Log;
 public class BluetoothService extends PhysicalLayerService {
 
 	private final IBinder mBinder = new MyBinder();
-	private static final String TAG = "AodvService";
+	private static final String TAG = "BluetoothService";
 
 	private volatile ArrayList<UUID> possibleUuids;
 	private static final String APP_NAME = "ahHocManager";
@@ -50,11 +50,11 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void onCreate() {
-		super.onCreate();
+		state = PhysicalLayerState.NOT_INITIALIZED;
 		registerBroadcastRecievers();
-		initialize();
 		nodeDao = new NodeDao(this);
 		nodeDao.open();
+		super.onCreate();
 	}
 
 	@Override
@@ -67,6 +67,8 @@ public class BluetoothService extends PhysicalLayerService {
 			connectedDevices = new HashMap<String, ActiveConnectionThread>();
 			initializeUUIDList();
 			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PHYSICAL_LAYER_INITIALIZED));
+			startListeningThread();
+			state = PhysicalLayerState.INITIALIZED;
 		}
 
 	}
@@ -137,12 +139,25 @@ public class BluetoothService extends PhysicalLayerService {
 	}
 
 	private void connectToDevice(Node node, int numberOfRetries) {
-		Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-		for (BluetoothDevice device : pairedDevices) {
-			if (device.getAddress().equals(node.getAddress())) {
-				connectToDevice(device, numberOfRetries);
-				break;
+		connectToDevice(node.getAddress(), numberOfRetries);
+	}
+
+	public void connectToDevice(String address, int numberOfRetries) {
+		if (!isCommunicationWithDeviceActive(address)) {
+			Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+			for (BluetoothDevice device : pairedDevices) {
+				if (device.getAddress().equals(address)) {
+					connectToDevice(device, numberOfRetries);
+					break;
+				}
 			}
+		}
+	}
+
+	public void disconnectFromDevice(String address) {
+		if (isCommunicationWithDeviceActive(address)) {
+			ActiveConnectionThread connectionThread = connectedDevices.get(address);
+			connectionThread.cancel();
 		}
 	}
 
@@ -220,25 +235,10 @@ public class BluetoothService extends PhysicalLayerService {
 					Log.d(TAG, "Wlasnie powiazano");
 				}
 			} else if (PhysicalLayerService.PHYSICAL_LAYER_MESSAGE.equals(action)) {
-				Log.d(TAG, "Skonczono laczenie sie");
-				PhysicalLayerEvent event = (PhysicalLayerEvent) intent.getSerializableExtra(PhysicalLayerService.PHYSICAL_LAYER_MESSAGE_TYPE);
-				handlePhysicalLayerEvent(event);
+
 			}
 		}
 	};
-
-	private void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
-		switch (event.getEventType()) {
-		case CONNECTING_TO_NEIGHBOURS_FINISHED:
-			if (PhysicalLayerState.INITIALIZING == state) {
-				startListeningThread();
-				state = PhysicalLayerState.INITIALIZED;
-			}
-			break;
-		default:
-			break;
-		}
-	}
 
 	private void registerBroadcastRecievers() {
 
@@ -281,13 +281,16 @@ public class BluetoothService extends PhysicalLayerService {
 				for (int i = 0; i < localPossibleUuids.size() && active; i++) {
 					try {
 						serverSocket = BluetoothAdapter.getDefaultAdapter().listenUsingRfcommWithServiceRecord(APP_NAME, localPossibleUuids.get(i));
+						// serverSocket =
+						// BluetoothAdapter.getDefaultAdapter().listenUsingInsecureRfcommWithServiceRecord(APP_NAME,
+						// localPossibleUuids.get(i));
 
 						// trying to connect
 						BluetoothSocket socket = serverSocket.accept();
 						serverSocket.close();
 						possibleUuids.remove(possibleUuids.indexOf(localPossibleUuids.get(i)));
 						startCommunication(socket, localPossibleUuids.get(i));
-					} catch (IOException e) {
+					} catch (Exception e) {
 						Log.e(this.getName(), e.toString());
 					}
 				}
@@ -338,15 +341,6 @@ public class BluetoothService extends PhysicalLayerService {
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
-				removeFromConnectedThreads(blueSocket.getRemoteDevice().getAddress());
-
-				// jezeli komunikacja byla rozpoczeta jako serwer nalezy zwrocic
-				// numer UUID do puli z ktorej brane beda numery UUID do nowych
-				// istanancji serwera
-				if (uuid != null) {
-					possibleUuids.add(uuid);
-				}
-				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_LOST, blueSocket.getRemoteDevice().getAddress()));
 			}
 		}
 
@@ -366,6 +360,19 @@ public class BluetoothService extends PhysicalLayerService {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+
+		private void handleDisconnect() {
+			removeFromConnectedThreads(blueSocket.getRemoteDevice().getAddress());
+
+			// jezeli komunikacja byla rozpoczeta jako serwer nalezy zwrocic
+			// numer UUID do puli z ktorej brane beda numery UUID do nowych
+			// istanancji serwera
+			if (uuid != null) {
+				possibleUuids.add(uuid);
+			}
+			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_LOST, blueSocket.getRemoteDevice().getAddress()));
+
 		}
 
 		public BluetoothSocket getBlueSocket() {
@@ -394,6 +401,9 @@ public class BluetoothService extends PhysicalLayerService {
 			BluetoothSocket connectionSocket = getConnectionSocket();
 			if (connectionSocket != null) {
 				startCommunication(connectionSocket, null);
+			} else {
+				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_NOT_ESTABLISHED, blueSocket.getRemoteDevice()
+						.getAddress()));
 			}
 		}
 
@@ -405,6 +415,8 @@ public class BluetoothService extends PhysicalLayerService {
 					try {
 						if (active) {
 							blueSocket = blueDevice.createRfcommSocketToServiceRecord(possibleUuids.get(i));
+							// blueSocket =
+							// blueDevice.createInsecureRfcommSocketToServiceRecord(possibleUuids.get(i));
 							blueSocket.connect();
 						} else {
 							break;
@@ -449,6 +461,9 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public IBinder onBind(Intent intent) {
+		if (PhysicalLayerState.NOT_INITIALIZED == state) {
+			initialize();
+		}
 		return mBinder;
 	}
 
@@ -458,7 +473,9 @@ public class BluetoothService extends PhysicalLayerService {
 	}
 
 	private void stopAllThreads() {
-		connectionReceiverThread.cancel();
+		if (connectionReceiverThread != null) {
+			connectionReceiverThread.cancel();
+		}
 		for (ActiveConnectionThread thread : connectedDevices.values()) {
 			thread.cancel();
 		}

@@ -2,6 +2,9 @@ package pl.rmalinowski.adhocmanager.api;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Set;
+
+import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
 
 public interface INetworkLayerService{
 	
@@ -22,5 +25,6 @@ public interface INetworkLayerService{
 	public void test2();
 
 	public void test3();
-	
+
+	public Set<RoutingTableEntry> getRoutingTable();
 }
