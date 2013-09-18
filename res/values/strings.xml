@@ -22,5 +22,6 @@
     <string name="list_devices">List Devices</string>
     <string name="manage_node">Manage node</string>
     <string name="disconnect">Disconnect</string>
+    <string name="ad_hoc_manager">AdHoc Manager</string>
 
 </resources>

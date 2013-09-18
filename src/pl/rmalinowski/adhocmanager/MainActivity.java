@@ -19,12 +19,6 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 
 	private static final int ADAPTED_DISABLED_BROADCAST_EVENT = 1;
 
-	private Button searchButton;
-	private Button connectButton;
-	private Button sendButton;
-	private Button testButton1;
-	private Button testButton2;
-	private Button testButton3;
 	private Button exitButton;
 	private Button discoverButton;
 	private Button deviceListButton;
@@ -46,24 +40,12 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 	}
 
 	private void initializeFields() {
-		searchButton = (Button) findViewById(R.id.main_search_for_devices);
-		connectButton = (Button) findViewById(R.id.main_connect_button);
-		sendButton = (Button) findViewById(R.id.main_send_button);
-		testButton1 = (Button) findViewById(R.id.main_test_1);
-		testButton2 = (Button) findViewById(R.id.main_test_2);
-		testButton3 = (Button) findViewById(R.id.main_test_3);
 		exitButton = (Button) findViewById(R.id.main_exit_button);
 		discoverButton = (Button) findViewById(R.id.main_discovery);
 		deviceListButton = (Button) findViewById(R.id.main_list_devices);
 	}
 
 	private void setListeners() {
-		searchButton.setOnClickListener(this);
-		connectButton.setOnClickListener(this);
-		sendButton.setOnClickListener(this);
-		testButton1.setOnClickListener(this);
-		testButton2.setOnClickListener(this);
-		testButton3.setOnClickListener(this);
 		exitButton.setOnClickListener(this);
 		discoverButton.setOnClickListener(this);
 		deviceListButton.setOnClickListener(this);
@@ -99,30 +81,15 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			if (BluetoothAdapter.getDefaultAdapter().isEnabled()) {
 				BluetoothAdapter.getDefaultAdapter().disable();
 			}
+			stopService(new Intent(this, AodvService.class));
 			finish();
-			break;
-		case R.id.main_search_for_devices:
-			networkService.searchForDevices();
-			break;
-		case R.id.main_connect_button:
-			networkService.connectToNeighbours();
-			break;
-		case R.id.main_send_button:
-			networkService.sendBroadcastData("dziala");
-			break;
-		case R.id.main_test_1:
-			networkService.test1();
-			break;
-		case R.id.main_test_2:
-			networkService.test2();
-			break;
-		case R.id.main_test_3:
-			networkService.test3();
 			break;
 		case R.id.main_discovery:
 			startActivity(new Intent(this, DiscoverActivity.class));
+			break;
 		case R.id.main_list_devices:
 			startActivity(new Intent(this, RoutingTableActivity.class));
+			break;
 		default:
 			break;
 		}
@@ -165,7 +132,6 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 
 	@Override
 	protected void onDestroy() {
-		stopService(new Intent(this, AodvService.class));
 		super.onDestroy();
 	}
 

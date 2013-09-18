@@ -2,6 +2,7 @@
 <TableRow xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
+    android:layout_weight="1"
     android:clickable="true" >
 
     <TextView
@@ -24,7 +25,7 @@
         android:layout_height="wrap_content"
         android:background="@drawable/cell_shape"
         android:padding="3dp" />
-    
+
     <TextView
         android:id="@+id/cell_nextHop"
         android:layout_width="fill_parent"

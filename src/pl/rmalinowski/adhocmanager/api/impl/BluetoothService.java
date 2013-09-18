@@ -82,14 +82,6 @@ public class BluetoothService extends PhysicalLayerService {
 	@Override
 	public void sendPacket(Packet packet, String destination) {
 		if (connectedDevices.containsKey(destination)) {
-			// przed wyslaniem pakietu istaw interfejs i dekrementuj pole TTL
-			if (packet.getTtl() != null) {
-				packet.setTtl(packet.getTtl() - 1);
-			} else {
-				packet.setTtl(AodvContants.TTL_VALUE);
-			}
-			packet.setInterfaceAddress(bluetoothAdapter.getAddress());
-
 			connectedDevices.get(destination).send(packet);
 		}
 	}
@@ -301,7 +293,9 @@ public class BluetoothService extends PhysicalLayerService {
 		public void cancel() {
 			try {
 				active = false;
-				serverSocket.close();
+				if (serverSocket != null){
+					serverSocket.close();					
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -341,11 +335,21 @@ public class BluetoothService extends PhysicalLayerService {
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
+				handleDisconnect();
 			}
 		}
 
 		public void send(Packet packet) {
 			try {
+				// przed wyslaniem pakietu istaw interfejs i dekrementuj pole
+				// TTL
+				if (packet.getTtl() != null) {
+					packet.setTtl(packet.getTtl() - 1);
+				} else {
+					packet.setTtl(AodvContants.TTL_VALUE);
+				}
+				packet.setInterfaceAddress(bluetoothAdapter.getAddress());
+
 				byte[] buffer = SerializationUtils.serialize(packet);
 				outStream.write(buffer);
 				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PACKET_SEND, packet));
@@ -384,7 +388,7 @@ public class BluetoothService extends PhysicalLayerService {
 
 	private class ConnnectionMakerThread extends Thread {
 		BluetoothDevice blueDevice;
-		private static final int CONNECTION_RETRY_DELAY = 100;
+		private static final int CONNECTION_RETRY_DELAY = 25;
 		private boolean active;
 		// private String selectedUuid;
 
@@ -453,7 +457,7 @@ public class BluetoothService extends PhysicalLayerService {
 		possibleUuids = new ArrayList<UUID>();
 		possibleUuids.add(UUID.fromString("503c7430-bc23-11de-8a39-0800200c9a66"));
 		possibleUuids.add(UUID.fromString("503c7431-bc23-11de-8a39-0800200c9a66"));
-		// possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
+		possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
 		// possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
 		// possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
 		// possibleUuids.add(UUID.fromString("503c7435-bc23-11de-8a39-0800200c9a66"));

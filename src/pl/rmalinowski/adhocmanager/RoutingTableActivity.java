@@ -4,7 +4,10 @@ import java.util.Set;
 
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
+import pl.rmalinowski.adhocmanager.model.RoutingTableEntryState;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnLongClickListener;
@@ -38,10 +41,18 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 		case SHOW_TOAST:
 			String textToShow = (String) event.getData();
 			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
+			initialize();
 			break;
 		case DATA_RECIEVED:
 			textToShow = (String) event.getData();
 			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
+			initialize();
+			break;
+		case NETWORK_STATE_CHANGED:
+			initialize();
+			break;
+		case DESTINATION_UNREACHABLE:
+			Toast.makeText(this, "nie udalo sie wyslanie wiadomosci", Toast.LENGTH_LONG).show();
 			break;
 		default:
 			break;
@@ -50,42 +61,51 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 
 	private void initialize() {
 		final TableLayout table = (TableLayout) findViewById(R.id.routing_table);
+		table.removeAllViews();
+		table.addView(getFirstRow());
 		for (RoutingTableEntry entry : routingTable) {
 			final TableRow tr = (TableRow) getLayoutInflater().inflate(R.layout.routing_table_row, null);
 
-			TextView tv;
-			tv = (TextView) tr.findViewById(R.id.cell_id);
+			TextView tv = (TextView) tr.findViewById(R.id.cell_id);
 			tv.setText(String.valueOf(entry.getDestinationNode().getId()));
 
-			TextView tv2;
-			tv2 = (TextView) tr.findViewById(R.id.cell_name);
-			tv2.setText(entry.getDestinationNode().getName());
+			tv = (TextView) tr.findViewById(R.id.cell_name);
+			tv.setText(entry.getDestinationNode().getName());
 
-			TextView tv3;
-			tv3 = (TextView) tr.findViewById(R.id.cell_address);
-			tv3.setText(entry.getDestinationNode().getAddress());
+			tv = (TextView) tr.findViewById(R.id.cell_address);
+			tv.setText(entry.getDestinationNode().getAddress());
 
-			TextView tv4;
-			tv4 = (TextView) tr.findViewById(R.id.cell_nextHop);
-			if (entry.getNextHopAddress() != null) {
-				tv4.setText(entry.getNextHopAddress());
+			tv = (TextView) tr.findViewById(R.id.cell_nextHop);
+			if (entry.getNextHopAddress() != null && RoutingTableEntryState.VALID == entry.getState()) {
+				tv.setText(entry.getNextHopAddress());
 			} else {
-				tv4.setText("---");
+				tv.setText("---");
 			}
 
-			TextView tv5;
-			tv5 = (TextView) tr.findViewById(R.id.cell_hopCount);
-			if (entry.getHopCount() != null) {
-				tv5.setText(entry.getHopCount());
+			tv = (TextView) tr.findViewById(R.id.cell_hopCount);
+			if (entry.getHopCount() != null && RoutingTableEntryState.VALID == entry.getState()) {
+				tv.setText(entry.getHopCount().toString());
 			} else {
-
-				tv5.setText("---");
+				tv.setText("---");
 			}
 
-			TextView tv6;
-			tv6 = (TextView) tr.findViewById(R.id.cell_status);
-			tv6.setText(entry.getState().toString());
-
+			tv = (TextView) tr.findViewById(R.id.cell_status);
+			tv.setText(entry.getState().toString());
+			int color = 0;
+			switch (entry.getState()) {
+			case INVALID:
+				color = Color.parseColor("#E80909");
+				break;
+			case VALID:
+				color = Color.parseColor("#23E809");
+				break;
+			case VALIDATING:
+				color = Color.parseColor("#E6ED09");
+				break;
+			default:
+				break;
+			}
+			tv.setTextColor(color);
 			tr.setOnLongClickListener(new OnLongClickListener() {
 
 				@Override
@@ -99,7 +119,35 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 				}
 			});
 			table.addView(tr);
-			initialized = true;
 		}
+		initialized = true;
+	}
+
+	private TableRow getFirstRow() {
+		final TableRow tr = (TableRow) getLayoutInflater().inflate(R.layout.routing_table_row, null);
+		TextView tv = (TextView) tr.findViewById(R.id.cell_id);
+		tv.setText("ID");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_name);
+		tv.setText("NAME");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_address);
+		tv.setText("ADDRESS");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_nextHop);
+		tv.setText("NEXT HOP");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_hopCount);
+		tv.setText("HOP COUNT");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_status);
+		tv.setText("STATUS");
+		tv.setTypeface(null, Typeface.BOLD);
+		return tr;
 	}
 }

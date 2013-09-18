@@ -88,6 +88,7 @@ public class AodvService extends NetworkLayerService {
 		DataPacket packet = new DataPacket(data);
 		packet.setDestinationAddress(destinationAddress);
 		packet.setSourceAddress(physicalService.getLocalAddress());
+		packet.setHopCount(1);
 		String nextHopAddress = entry.getNextHopAddress();
 		switch (entryState) {
 		// jesli wpis o wezle docelowym jest aktualny
@@ -122,6 +123,7 @@ public class AodvService extends NetworkLayerService {
 		default:
 			break;
 		}
+		sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.NETWORK_STATE_CHANGED));
 	}
 
 	private void addDataPacketToWaitingQueue(DataPacket packet) {
@@ -170,8 +172,10 @@ public class AodvService extends NetworkLayerService {
 			String addressOfLostedNeighbour = (String) event.getData();
 			handleNeighbourLost(addressOfLostedNeighbour);
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Utracono polaczenie do sasiada"));
+			break;
 		case CONNECTION_TO_NEIGHBOUR_NOT_ESTABLISHED:
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Nie udalo sie nawiazac polaczenia do sasiada"));
+			break;
 		default:
 			break;
 		}
@@ -205,6 +209,7 @@ public class AodvService extends NetworkLayerService {
 		} else if (packet instanceof RoutingPacket) {
 			handleRecievedRoutingPacket((RoutingPacket) packet);
 		}
+		sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.NETWORK_STATE_CHANGED));
 	}
 
 	private void handleRecievedDataPacket(DataPacket dataPacket) {
@@ -213,7 +218,10 @@ public class AodvService extends NetworkLayerService {
 			// wyslij informacje do wyzszych warstw
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.DATA_RECIEVED, dataPacket.getData()));
 			// zaktualizuj dane o wezle ktory wyslal wiadomosc
-			validateRoutingTableEntry(dataPacket.getSourceAddress());
+			RoutingTableEntry sourceEntry = findRoutingTableEntryForAddress(dataPacket.getSourceAddress());
+			validateRoutingTableEntry(sourceEntry);
+			sourceEntry.setHopCount(dataPacket.getHopCount());
+			sourceEntry.setNextHopAddress(dataPacket.getInterfaceAddress());
 			// jezeli sasiad od ktorego otrzymano wiadomosc nie jest nadawca
 			// zaktualizuj dane takze o nim
 			if (!nodeIsNeighbour(dataPacket.getSourceAddress())) {
@@ -224,6 +232,8 @@ public class AodvService extends NetworkLayerService {
 			RoutingTableEntry destinationEntry = findRoutingTableEntryForAddress(dataPacket.getDestinationAddress());
 			// jezeli wpis w tabeli routingu do wezla docelowego jest aktualny
 			if (RoutingTableEntryState.VALID == destinationEntry.getState()) {
+				// podbij ilosc skokow dla wiadomosci
+				dataPacket.setHopCount(dataPacket.getHopCount() + 1);
 				// przekaz wiadomosc dalej do urzadzenia pobranego z tabeli
 				// routingu
 				physicalService.sendPacket(dataPacket, destinationEntry.getNextHopAddress());
@@ -303,6 +313,7 @@ public class AodvService extends NetworkLayerService {
 			errorNode.setAddress(entry.getDestinationNode().getAddress());
 			// numer zostal juz wczesniej zwiekszony
 			errorNode.setSequenceNumber(entry.getSequenceNumber());
+			unreachableNodes.add(errorNode);
 		}
 		rerrMessage.setUnreachableNodes(unreachableNodes);
 
@@ -421,12 +432,13 @@ public class AodvService extends NetworkLayerService {
 		if (!destinationEntry.getValidSequenceNumber()
 				|| message.getDestinationSeq() > destinationEntry.getSequenceNumber()
 				|| (message.getDestinationSeq().equals(destinationEntry.getSequenceNumber()) && (!destinationEntry.getState().equals(
-						RoutingTableEntryState.VALID) || message.getHopCount() < destinationEntry.getHopCount()))) {
+						RoutingTableEntryState.VALID) || (destinationEntry.getHopCount() != null && message.getHopCount() < destinationEntry.getHopCount())))) {
 			validateRoutingTableEntry(destinationEntry);
 			destinationEntry.setState(RoutingTableEntryState.VALID);
 			destinationEntry.setValidSequenceNumber(true);
 			destinationEntry.setNextHopAddress(message.getInterfaceAddress());
 			destinationEntry.setSequenceNumber(message.getDestinationSeq());
+			destinationEntry.setHopCount(message.getHopCount());
 		}
 		// nalezy przekazac wiadomosc dalej
 		if (!message.getOriginAddress().equals(physicalService.getLocalAddress())) {
@@ -442,7 +454,7 @@ public class AodvService extends NetworkLayerService {
 			if (dataPacketsQueues.containsKey(message.getDestinationAddress())) {
 				LinkedList<DataPacket> packetsQueue = dataPacketsQueues.get(message.getDestinationAddress());
 				while (!packetsQueue.isEmpty()) {
-					DataPacket packetToSend = packetsQueue.peekFirst();
+					DataPacket packetToSend = packetsQueue.pollFirst();
 					physicalService.sendPacket(packetToSend, destinationEntry.getNextHopAddress());
 				}
 			}
@@ -513,6 +525,20 @@ public class AodvService extends NetworkLayerService {
 		return rreqMessage;
 	}
 
+	private class checkRoutingTableThread extends Thread {
+		private final int checkInterval;
+
+		public checkRoutingTableThread(int checkInterval) {
+			super();
+			this.checkInterval = checkInterval;
+		}
+
+		@Override
+		public void run() {
+
+		}
+	}
+
 	private class RreqMessageSenderThread extends Thread {
 
 		private final RoutingTableEntry entry;
@@ -532,7 +558,8 @@ public class AodvService extends NetworkLayerService {
 					RREQMessage rreqMessage = generateRREQMessage(entry);
 					physicalService.sendPacketBroadcast(rreqMessage);
 					try {
-						wait(AodvContants.NET_TRAVERSAL_TIME);
+						Thread.sleep(AodvContants.NET_TRAVERSAL_TIME);
+						// wait(AodvContants.NET_TRAVERSAL_TIME);
 					} catch (InterruptedException e) {
 						Log.d(TAG, "przerwano watek!");
 					}
@@ -547,8 +574,11 @@ public class AodvService extends NetworkLayerService {
 			if (!routeEstablished) {
 				// ustaw wezel jako nieaktywny
 				entry.setState(RoutingTableEntryState.INVALID);
-				// wyczysc kolejke pakietow
-				dataPacketsQueues.get(entry).clear();
+				// wyczysc kolejke pakietow jesli cos sie w niej znajduje (a
+				// powinno)
+				if (dataPacketsQueues.get(entry.getDestinationNode().getAddress()) != null) {
+					dataPacketsQueues.get(entry.getDestinationNode().getAddress()).clear();
+				}
 				sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.DESTINATION_UNREACHABLE, entry.getDestinationNode().getAddress()));
 			}
 		}
@@ -575,6 +605,8 @@ public class AodvService extends NetworkLayerService {
 
 	private void invalidateRoutingTableEntry(RoutingTableEntry entry) {
 		entry.setState(RoutingTableEntryState.INVALID);
+		entry.setNextHopAddress(null);
+		entry.setHopCount(null);
 		if (nodeIsNeighbour(entry)) {
 			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
 		} else {
@@ -585,7 +617,7 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private boolean nodeIsNeighbour(RoutingTableEntry entry) {
-		if (entry.getDestinationNode().getAddress().equals(entry)) {
+		if (entry.getDestinationNode().getAddress().equals(entry.getNextHopAddress())) {
 			return true;
 		} else {
 			return false;
@@ -602,20 +634,13 @@ public class AodvService extends NetworkLayerService {
 		return checkNodeValidity(entry);
 	}
 
-	/**
-	 * metoda sprawdza czy wpis w tablicy rutingu o danym wezle jest ciagle
-	 * aktualny
-	 * 
-	 * @param entry
-	 * @return
-	 */
 	private RoutingTableEntryState checkNodeValidity(RoutingTableEntry entry) {
 		// jezli wezel jest sasiadem, wtedy zawsze jest aktualny
 		if (entry.getDestinationNode().getAddress().equals(entry.getNextHopAddress())) {
 			return RoutingTableEntryState.VALID;
 		} else {
 			// jezeli dane o wezle sa przeterminowane
-			if (new Date().getTime() > entry.getValidTimestamp()) {
+			if (entry.getValidTimestamp() == null || new Date().getTime() > entry.getValidTimestamp()) {
 				return RoutingTableEntryState.INVALID;
 			} // jezeli caly czas sa aktualne
 			else {

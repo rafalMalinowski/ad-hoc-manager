@@ -6,11 +6,13 @@ public class DataPacket extends Packet {
 
 	private static final long serialVersionUID = 6637195236740189077L;
 	private Serializable data;
-	//adres docelowy do ktorego skierowana jest wiadomosc
+	// adres docelowy do ktorego skierowana jest wiadomosc
 	private String destinationAddress;
-	//adres nadawcy wiadomosci
+	// adres nadawcy wiadomosci
 	private String sourceAddress;
-	
+	// ilosc skokow wiadomosci
+	private Integer hopCount;
+
 	public DataPacket(Serializable data) {
 		super();
 		this.data = data;
@@ -38,6 +40,14 @@ public class DataPacket extends Packet {
 
 	public void setSourceAddress(String sourceAddress) {
 		this.sourceAddress = sourceAddress;
+	}
+
+	public Integer getHopCount() {
+		return hopCount;
+	}
+
+	public void setHopCount(Integer hopCount) {
+		this.hopCount = hopCount;
 	}
 
 }

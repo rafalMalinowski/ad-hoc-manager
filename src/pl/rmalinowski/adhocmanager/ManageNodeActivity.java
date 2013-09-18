@@ -73,7 +73,7 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.manage_button_connect:
-			physicalService.connectToDevice(address, 1);
+			physicalService.connectToDevice(address, 4);
 			Log.d(TAG, "test");
 			finish();
 			break;
