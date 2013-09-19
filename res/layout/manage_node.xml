@@ -21,22 +21,30 @@
             android:id="@+id/manage_button_connect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="0.33"
+            android:layout_weight="0.25"
             android:text="@string/connect" />
 
         <Button
             android:id="@+id/manage_button_send"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="0.33"
+            android:layout_weight="0.25"
             android:text="@string/send" />
 
         <Button
             android:id="@+id/manage_button_disconnect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="0.33"
+            android:layout_weight="0.25"
             android:text="@string/disconnect" />
+        
+        <Button
+            android:id="@+id/manage_button_spam"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.25"
+            android:text="@string/spam" />
+
     </LinearLayout>
 
 </LinearLayout>

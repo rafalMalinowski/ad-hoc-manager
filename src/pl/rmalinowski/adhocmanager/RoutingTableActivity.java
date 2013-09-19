@@ -1,5 +1,6 @@
 package pl.rmalinowski.adhocmanager;
 
+import java.util.Date;
 import java.util.Set;
 
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
@@ -10,6 +11,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -45,7 +47,7 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 			break;
 		case DATA_RECIEVED:
 			textToShow = (String) event.getData();
-			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
+//			Toast.makeText(this, textToShow, Toast.LENGTH_SHORT).show();
 			initialize();
 			break;
 		case NETWORK_STATE_CHANGED:
@@ -106,18 +108,46 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 				break;
 			}
 			tv.setTextColor(color);
-			tr.setOnLongClickListener(new OnLongClickListener() {
+
+			tv = (TextView) tr.findViewById(R.id.cell_lifetime);
+
+			if (entry.getValidTimestamp() != null && RoutingTableEntryState.VALID == entry.getState()) {
+				long lifeTimeInSeconds;
+				if ((entry.getValidTimestamp() - new Date().getTime()) > 0) {
+					lifeTimeInSeconds = (entry.getValidTimestamp() - new Date().getTime()) / 1000;
+				} else {
+					lifeTimeInSeconds = 0;
+				}
+				tv.setText(String.valueOf(lifeTimeInSeconds));
+			} else {
+				tv.setText("---");
+			}
+			tr.setOnClickListener(new OnClickListener() {
 
 				@Override
-				public boolean onLongClick(View v) {
+				public void onClick(View v) {
 					TableRow tablerow = (TableRow) v;
 					TextView textView = (TextView) tablerow.getChildAt(ADDRESS_IN_TABLE_POSITON);
 					Intent intent = new Intent(getBaseContext(), ManageNodeActivity.class);
 					intent.putExtra(ManageNodeActivity.ADDRESS_INTENT_EXTRA, textView.getText());
 					startActivity(intent);
-					return true;
 				}
 			});
+			// tr.setOnLongClickListener(new OnLongClickListener() {
+			//
+			// @Override
+			// public boolean onLongClick(View v) {
+			// TableRow tablerow = (TableRow) v;
+			// TextView textView = (TextView)
+			// tablerow.getChildAt(ADDRESS_IN_TABLE_POSITON);
+			// Intent intent = new Intent(getBaseContext(),
+			// ManageNodeActivity.class);
+			// intent.putExtra(ManageNodeActivity.ADDRESS_INTENT_EXTRA,
+			// textView.getText());
+			// startActivity(intent);
+			// return true;
+			// }
+			// });
 			table.addView(tr);
 		}
 		initialized = true;
@@ -142,11 +172,15 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 		tv.setTypeface(null, Typeface.BOLD);
 
 		tv = (TextView) tr.findViewById(R.id.cell_hopCount);
-		tv.setText("HOP COUNT");
+		tv.setText("HOPS");
 		tv.setTypeface(null, Typeface.BOLD);
 
 		tv = (TextView) tr.findViewById(R.id.cell_status);
 		tv.setText("STATUS");
+		tv.setTypeface(null, Typeface.BOLD);
+
+		tv = (TextView) tr.findViewById(R.id.cell_lifetime);
+		tv.setText("LIFETIME");
 		tv.setTypeface(null, Typeface.BOLD);
 		return tr;
 	}

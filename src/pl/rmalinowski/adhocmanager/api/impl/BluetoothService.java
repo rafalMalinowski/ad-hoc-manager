@@ -88,8 +88,10 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void sendPacketBroadcast(Packet packet) {
-		for (ActiveConnectionThread thread : connectedDevices.values()) {
-			thread.send(packet);
+		if (connectedDevices != null) {
+			for (ActiveConnectionThread thread : connectedDevices.values()) {
+				thread.send(packet);
+			}
 		}
 	}
 
@@ -293,8 +295,76 @@ public class BluetoothService extends PhysicalLayerService {
 		public void cancel() {
 			try {
 				active = false;
-				if (serverSocket != null){
-					serverSocket.close();					
+				if (serverSocket != null) {
+					serverSocket.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	// ///////////////////////////////////////////////////
+
+	private class ConnnectionMakerThread extends Thread {
+		BluetoothDevice blueDevice;
+		private static final int CONNECTION_RETRY_DELAY = 25;
+		private boolean active;
+		// private String selectedUuid;
+
+		BluetoothSocket blueSocket = null;
+		int numberOfRetries = 0;
+
+		public ConnnectionMakerThread(BluetoothDevice blueDevice, int numberOfRetries) {
+			this.blueDevice = blueDevice;
+			this.numberOfRetries = numberOfRetries;
+			active = true;
+		}
+
+		public void run() {
+			BluetoothSocket connectionSocket = getConnectionSocket();
+			if (connectionSocket != null) {
+				startCommunication(connectionSocket, null);
+			} else {
+				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_NOT_ESTABLISHED, blueDevice.getAddress()));
+			}
+		}
+
+		private BluetoothSocket getConnectionSocket() {
+			bluetoothAdapter.cancelDiscovery();
+
+			for (int j = 0; j < numberOfRetries; j++) {
+				for (int i = 0; i < possibleUuids.size(); i++) {
+					try {
+						if (active) {
+							blueSocket = blueDevice.createRfcommSocketToServiceRecord(possibleUuids.get(i));
+							// blueSocket =
+							// blueDevice.createInsecureRfcommSocketToServiceRecord(possibleUuids.get(i));
+							blueSocket.connect();
+						} else {
+							break;
+						}
+						decreaseNumberOfActiveSearches();
+						return blueSocket;
+					} catch (IOException e) {
+						e.printStackTrace();
+						try {
+							Thread.sleep(CONNECTION_RETRY_DELAY);
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						}
+					}
+				}
+			}
+			decreaseNumberOfActiveSearches();
+			return null;
+		}
+
+		public void cancel() {
+			try {
+				active = false;
+				if (blueSocket != null) {
+					blueSocket.close();
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -375,81 +445,18 @@ public class BluetoothService extends PhysicalLayerService {
 			if (uuid != null) {
 				possibleUuids.add(uuid);
 			}
+			try {
+				blueSocket.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_LOST, blueSocket.getRemoteDevice().getAddress()));
 
 		}
 
 		public BluetoothSocket getBlueSocket() {
 			return blueSocket;
-		}
-	}
-
-	// ///////////////////////////////////////////////////
-
-	private class ConnnectionMakerThread extends Thread {
-		BluetoothDevice blueDevice;
-		private static final int CONNECTION_RETRY_DELAY = 25;
-		private boolean active;
-		// private String selectedUuid;
-
-		BluetoothSocket blueSocket = null;
-		int numberOfRetries = 0;
-
-		public ConnnectionMakerThread(BluetoothDevice blueDevice, int numberOfRetries) {
-			this.blueDevice = blueDevice;
-			this.numberOfRetries = numberOfRetries;
-			active = true;
-		}
-
-		public void run() {
-			BluetoothSocket connectionSocket = getConnectionSocket();
-			if (connectionSocket != null) {
-				startCommunication(connectionSocket, null);
-			} else {
-				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_NOT_ESTABLISHED, blueSocket.getRemoteDevice()
-						.getAddress()));
-			}
-		}
-
-		private BluetoothSocket getConnectionSocket() {
-			bluetoothAdapter.cancelDiscovery();
-
-			for (int j = 0; j < numberOfRetries; j++) {
-				for (int i = 0; i < possibleUuids.size(); i++) {
-					try {
-						if (active) {
-							blueSocket = blueDevice.createRfcommSocketToServiceRecord(possibleUuids.get(i));
-							// blueSocket =
-							// blueDevice.createInsecureRfcommSocketToServiceRecord(possibleUuids.get(i));
-							blueSocket.connect();
-						} else {
-							break;
-						}
-						decreaseNumberOfActiveSearches();
-						return blueSocket;
-					} catch (IOException e) {
-						e.printStackTrace();
-						try {
-							Thread.sleep(CONNECTION_RETRY_DELAY);
-						} catch (InterruptedException e1) {
-							e1.printStackTrace();
-						}
-					}
-				}
-			}
-			decreaseNumberOfActiveSearches();
-			return null;
-		}
-
-		public void cancel() {
-			try {
-				active = false;
-				if (blueSocket != null) {
-					blueSocket.close();
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
 		}
 	}
 

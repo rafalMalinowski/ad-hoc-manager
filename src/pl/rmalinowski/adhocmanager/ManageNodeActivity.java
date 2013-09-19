@@ -3,8 +3,7 @@ package pl.rmalinowski.adhocmanager;
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
 import pl.rmalinowski.adhocmanager.api.impl.BluetoothService;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
-import pl.rmalinowski.adhocmanager.model.packets.DataPacket;
-import pl.rmalinowski.adhocmanager.model.packets.Packet;
+import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -24,6 +23,7 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 	private Button connect;
 	private Button send;
 	private Button disconnect;
+	private Button spam;
 	private String address;
 
 	@Override
@@ -33,18 +33,17 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 		initializeFields();
 		setListeners();
 		Bundle extras = getIntent().getExtras();
-		if (extras != null){
+		if (extras != null) {
 			address = extras.getString(ADDRESS_INTENT_EXTRA);
 		}
 	}
-	
 
 	@Override
 	protected void onResume() {
 		super.onResume();
 		bindService(new Intent(this, BluetoothService.class), physicalConnection, Context.BIND_AUTO_CREATE);
 	}
-	
+
 	@Override
 	protected void onPause() {
 		unbindService(physicalConnection);
@@ -55,12 +54,14 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 		connect = (Button) findViewById(R.id.manage_button_connect);
 		send = (Button) findViewById(R.id.manage_button_send);
 		disconnect = (Button) findViewById(R.id.manage_button_disconnect);
+		spam = (Button) findViewById(R.id.manage_button_spam);
 	}
 
 	private void setListeners() {
 		connect.setOnClickListener(this);
 		send.setOnClickListener(this);
 		disconnect.setOnClickListener(this);
+		spam.setOnClickListener(this);
 	}
 
 	@Override
@@ -85,11 +86,30 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 			physicalService.disconnectFromDevice(address);
 			finish();
 			break;
+		case R.id.manage_button_spam:
+			new Thread(new Runnable() {
+				public void run() {
+					int id = 0;
+					String addrs = address;
+					while (true) {
+						Log.d("TAG", "dzialam");
+						id++;
+						networkService.sendData("test-" + id, addrs);
+						try {
+							Thread.sleep(3000);
+						} catch (InterruptedException e) {
+							Log.d(TAG, "przerwano watek!");
+						}
+					}
+				}
+			}).start();
+			finish();
+			break;
 		default:
 			break;
 		}
 	}
-	
+
 	protected ServiceConnection physicalConnection = new ServiceConnection() {
 
 		public void onServiceConnected(ComponentName className, IBinder binder) {
