@@ -188,6 +188,14 @@ public class BluetoothService extends PhysicalLayerService {
 		}
 		bluetoothAdapter.startDiscovery();
 	}
+	
+
+	@Override
+	public void cancelSearchingForNeighbours() {
+		if (bluetoothAdapter.isDiscovering()) {
+			bluetoothAdapter.cancelDiscovery();
+		}
+	}
 
 	private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
 		@Override
@@ -411,7 +419,7 @@ public class BluetoothService extends PhysicalLayerService {
 
 		public void send(Packet packet) {
 			try {
-				// przed wyslaniem pakietu istaw interfejs i dekrementuj pole
+				// przed wyslaniem pakietu ustaw interfejs i dekrementuj pole
 				// TTL
 				if (packet.getTtl() != null) {
 					packet.setTtl(packet.getTtl() - 1);
@@ -487,15 +495,19 @@ public class BluetoothService extends PhysicalLayerService {
 		if (connectionReceiverThread != null) {
 			connectionReceiverThread.cancel();
 		}
-		for (ActiveConnectionThread thread : connectedDevices.values()) {
-			thread.cancel();
+		if (connectedDevices != null) {
+			for (ActiveConnectionThread thread : connectedDevices.values()) {
+				thread.cancel();
+			}
 		}
 		connectedDevices = null;
 	}
 
 	@Override
 	public void onDestroy() {
-		nodeDao.close();
+		if (nodeDao != null) {
+			nodeDao.close();
+		}
 		stopAllThreads();
 		unregisterReceiver(broadcastReceiver);
 		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
@@ -506,5 +518,6 @@ public class BluetoothService extends PhysicalLayerService {
 	public String getLocalAddress() {
 		return bluetoothAdapter.getAddress();
 	}
+
 
 }

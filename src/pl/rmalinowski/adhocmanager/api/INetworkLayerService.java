@@ -15,6 +15,8 @@ public interface INetworkLayerService{
 	public void reInitialize();
 	
 	public void searchForDevices();
+
+	public void stopSearchingForDevices();
 	
 	public void connectToNeighbours();
 	

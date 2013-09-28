@@ -34,25 +34,26 @@ public final class R {
     public static final class id {
         public static final int bluetooth_button_find_devices=0x7f090001;
         public static final int bluetooth_button_start=0x7f090000;
-        public static final int cell_address=0x7f09000f;
-        public static final int cell_hopCount=0x7f090011;
-        public static final int cell_id=0x7f09000d;
-        public static final int cell_lifetime=0x7f090013;
-        public static final int cell_name=0x7f09000e;
-        public static final int cell_nextHop=0x7f090010;
-        public static final int cell_status=0x7f090012;
+        public static final int cell_address=0x7f090010;
+        public static final int cell_hopCount=0x7f090012;
+        public static final int cell_id=0x7f09000e;
+        public static final int cell_lifetime=0x7f090014;
+        public static final int cell_name=0x7f09000f;
+        public static final int cell_nextHop=0x7f090011;
+        public static final int cell_status=0x7f090013;
         public static final int discover_make_discover=0x7f090002;
         public static final int discover_search=0x7f090003;
-        public static final int discoverable=0x7f090014;
-        public static final int main_discovery=0x7f090005;
-        public static final int main_exit_button=0x7f090007;
-        public static final int main_list_devices=0x7f090006;
-        public static final int manage_button_connect=0x7f090009;
-        public static final int manage_button_disconnect=0x7f09000b;
-        public static final int manage_button_send=0x7f09000a;
-        public static final int manage_button_spam=0x7f09000c;
-        public static final int routing_table=0x7f090008;
-        public static final int textView1=0x7f090004;
+        public static final int discover_stop=0x7f090004;
+        public static final int discoverable=0x7f090015;
+        public static final int main_discovery=0x7f090006;
+        public static final int main_exit_button=0x7f090008;
+        public static final int main_list_devices=0x7f090007;
+        public static final int manage_button_connect=0x7f09000a;
+        public static final int manage_button_disconnect=0x7f09000c;
+        public static final int manage_button_send=0x7f09000b;
+        public static final int manage_button_spam=0x7f09000d;
+        public static final int routing_table=0x7f090009;
+        public static final int textView1=0x7f090005;
     }
     public static final class layout {
         public static final int activity_bluetooth=0x7f030000;
@@ -83,6 +84,7 @@ public final class R {
         public static final int make_discoverable=0x7f060011;
         public static final int manage_node=0x7f060013;
         public static final int search=0x7f060008;
+        public static final int search_stop=0x7f060017;
         public static final int send=0x7f06000a;
         public static final int spam=0x7f060016;
         public static final int start_network=0x7f060006;

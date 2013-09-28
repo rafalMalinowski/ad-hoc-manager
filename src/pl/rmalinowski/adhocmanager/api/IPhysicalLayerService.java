@@ -14,6 +14,8 @@ public interface IPhysicalLayerService {
 	public void sendPacketBroadcast(Packet packet);
 	
 	public void searchForNeighbours();
+	
+	public void cancelSearchingForNeighbours();
 
 	public void connectToNeighbours();
 	

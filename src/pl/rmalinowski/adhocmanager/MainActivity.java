@@ -1,8 +1,8 @@
 package pl.rmalinowski.adhocmanager;
 
-import pl.rmalinowski.adhocmanager.api.impl.AodvService;
-import pl.rmalinowski.adhocmanager.api.impl.BluetoothService;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
+import pl.rmalinowski.adhocmanager.utils.AhHocManagerConfiguration;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
@@ -10,8 +10,8 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
 import android.view.View.OnClickListener;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -51,19 +51,18 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		deviceListButton.setOnClickListener(this);
 	}
 
+	@SuppressWarnings("rawtypes")
 	private void startServices() {
-		startService(new Intent(this, BluetoothService.class));
-		// startService(new Intent(this, WiFiDirectService.class));
-		startService(new Intent(this, AodvService.class));
+
+		// startService(new Intent(this,
+		// AhHocManagerConfiguration.physicalLayerClass));
+
+		startService(new Intent(this, AhHocManagerConfiguration.networkLayerClass));
 	}
 
+	@Override
 	protected void handleNetworkLayerEvent(NetworkLayerEvent event) {
 		switch (event.getEventType()) {
-		case ADAPTED_DISABLED:
-			String actionName = (String) event.getData();
-			Intent enableIntent = new Intent(actionName);
-			startActivityForResult(enableIntent, ADAPTED_DISABLED_BROADCAST_EVENT);
-			break;
 		case SHOW_TOAST:
 			String textToShow = (String) event.getData();
 			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
@@ -71,7 +70,19 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		default:
 			break;
 		}
+	}
 
+	@Override
+	protected void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
+		switch (event.getEventType()) {
+		case ADAPTER_NOT_ENABLED:
+			String actionName = (String) event.getData();
+			Intent enableIntent = new Intent(actionName);
+			startActivityForResult(enableIntent, ADAPTED_DISABLED_BROADCAST_EVENT);
+			break;
+		default:
+			break;
+		}
 	}
 
 	@Override
@@ -81,7 +92,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			if (BluetoothAdapter.getDefaultAdapter().isEnabled()) {
 				BluetoothAdapter.getDefaultAdapter().disable();
 			}
-			stopService(new Intent(this, AodvService.class));
+			stopService(new Intent(this, AhHocManagerConfiguration.networkLayerClass));
 			finish();
 			break;
 		case R.id.main_discovery:

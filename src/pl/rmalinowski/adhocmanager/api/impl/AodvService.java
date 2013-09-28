@@ -28,7 +28,7 @@ import pl.rmalinowski.adhocmanager.model.packets.RREQMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RoutingPacket;
 import pl.rmalinowski.adhocmanager.persistence.NodeDao;
 import pl.rmalinowski.adhocmanager.utils.AodvContants;
-import pl.rmalinowski.adhocmanager.utils.SimpleConstants;
+import pl.rmalinowski.adhocmanager.utils.AhHocManagerConfiguration;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -53,17 +53,21 @@ public class AodvService extends NetworkLayerService {
 	private volatile Integer rreqMessageId;
 	private Map<String, Long> recentlyRecievedRreqMessagesTimestamps;
 	private CheckRoutingTableThread checkRoutingTableThread;
-	private String localAddress;
 
 	@Override
 	public void onCreate() {
-		bindService(new Intent(this, BluetoothService.class), mConnection, Context.BIND_AUTO_CREATE);
-		// bindService(new Intent(this, WiFiDirectService.class), mConnection,
-		// Context.BIND_AUTO_CREATE);
 		registerBroadcastRecievers();
 		nodeDao = new NodeDao(this);
 		nodeDao.open();
+		initializeNetworkLayer();
+		bindService(new Intent(this, AhHocManagerConfiguration.physicalLayerClass), mConnection, Context.BIND_AUTO_CREATE);
 		super.onCreate();
+	}
+	
+	@SuppressWarnings("rawtypes")
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		return Service.START_NOT_STICKY;
 	}
 
 	private void initializeNetworkLayer() {
@@ -72,9 +76,8 @@ public class AodvService extends NetworkLayerService {
 		dataPacketsQueues = new HashMap<String, LinkedList<DataPacket>>();
 		recentlyRecievedRreqMessagesTimestamps = new HashMap<String, Long>();
 		initializeRoutingTable();
-		checkRoutingTableThread = new CheckRoutingTableThread(SimpleConstants.ROUTING_TABLE_REFRESH_INTERVAL);
+		checkRoutingTableThread = new CheckRoutingTableThread(AhHocManagerConfiguration.ROUTING_TABLE_REFRESH_INTERVAL);
 		checkRoutingTableThread.start();
-		localAddress = physicalService.getLocalAddress();
 	}
 
 	private void initializeRoutingTable() {
@@ -149,7 +152,7 @@ public class AodvService extends NetworkLayerService {
 	private void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
 		switch (event.getEventType()) {
 		case ADAPTER_NOT_ENABLED:
-			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED, event.getData()));
+//			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED, event.getData()));
 			break;
 		case CONNECTION_TO_NEIGHBOUR_ESTABLISHED:
 			String address = (String) event.getData();
@@ -160,12 +163,8 @@ public class AodvService extends NetworkLayerService {
 			entry.setValidTimestamp(new Date().getTime() + AodvContants.NIEGHBOUR_ACTIVE_ROUTE_TIMEOUT);
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "Podlaczono do sasiada"));
 			break;
-		case PHYSICAL_LAYER_INITIALIZED:
-			initializeNetworkLayer();
-			// physicalService.connectToNeighbours();
-			break;
 		case CONNECTING_TO_NEIGHBOURS_FINISHED:
-			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "uruchomiono wartswe fizyczna"));
+			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.SHOW_TOAST, "uruchomiono warstwe fizyczna"));
 			break;
 		case PACKET_RECEIVED:
 			handleRecievedPacket((Packet) event.getData());
@@ -222,7 +221,7 @@ public class AodvService extends NetworkLayerService {
 
 	private void handleRecievedDataPacket(DataPacket dataPacket) {
 		// jezeli wezel jest adresatem wiadomosci
-		if (localAddress.equals(dataPacket.getDestinationAddress())) {
+		if (physicalService.getLocalAddress().equals(dataPacket.getDestinationAddress())) {
 			// wyslij informacje do wyzszych warstw
 			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.DATA_RECIEVED, dataPacket.getData()));
 			// zaktualizuj dane o wezle ktory wyslal wiadomosc
@@ -387,7 +386,7 @@ public class AodvService extends NetworkLayerService {
 		makeRoutingTableEntryValid(sourceEntry);
 
 		// jesli dany wezel jest wezlem docelowym to wyslij odpowiedz
-		if (localAddress.equals(message.getDestinationAddress())) {
+		if (physicalService.getLocalAddress().equals(message.getDestinationAddress())) {
 			// wygeneruj wiadomosc RREP
 			RREPMessage rrepMessage = generateRrepMessageAsDestination(message);
 			// odeslij pakiet RREP spowrotem droga ktora przyszedl
@@ -449,7 +448,7 @@ public class AodvService extends NetworkLayerService {
 			destinationEntry.setHopCount(message.getHopCount());
 		}
 		// nalezy przekazac wiadomosc dalej
-		if (!message.getOriginAddress().equals(localAddress)) {
+		if (!message.getOriginAddress().equals(physicalService.getLocalAddress())) {
 			RoutingTableEntry originatorEntry = findRoutingTableEntryForAddress(message.getOriginAddress());
 			physicalService.sendPacket(message, originatorEntry.getNextHopAddress());
 
@@ -521,7 +520,7 @@ public class AodvService extends NetworkLayerService {
 			rreqMessage.setDestinationSeq(0);
 		}
 		rreqMessage.setDestinationAddress(entry.getDestinationNode().getAddress());
-		rreqMessage.setOriginAddress(localAddress);
+		rreqMessage.setOriginAddress(physicalService.getLocalAddress());
 		rreqMessage.setOriginSeq(nodeSequenceNumber);
 		rreqMessage.setId(++rreqMessageId);
 		rreqMessage.setHopCount(0);
@@ -529,7 +528,7 @@ public class AodvService extends NetworkLayerService {
 		rreqMessage.setFlagG(AodvContants.DEFAULT_G_FLAG_IN_RREQ_VALUE);
 
 		// wstaw do tabeli, tak aby nie odpowiadac na wlasne wiadomosci RREQ
-		recentlyRecievedRreqMessagesTimestamps.put(rreqMessageId + "_" + localAddress, new Date().getTime());
+		recentlyRecievedRreqMessagesTimestamps.put(rreqMessageId + "_" + physicalService.getLocalAddress(), new Date().getTime());
 		return rreqMessage;
 	}
 
@@ -611,13 +610,14 @@ public class AodvService extends NetworkLayerService {
 			}
 		}
 	}
-	
-	private boolean makeRoutingTableEntryValidLonger(String address){
+
+	private boolean makeRoutingTableEntryValidLonger(String address) {
 		boolean validityExtended = false;
 		if (address != null) {
 			RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
-			// wpis musi byc aktualny. Jezeli w miedzyczasie jakis wezel go uniewaznil, to jego aktualnosc nie moze zostac przedluzona
-			if (RoutingTableEntryState.VALID == entry.getState()){
+			// wpis musi byc aktualny. Jezeli w miedzyczasie jakis wezel go
+			// uniewaznil, to jego aktualnosc nie moze zostac przedluzona
+			if (RoutingTableEntryState.VALID == entry.getState()) {
 				makeRoutingTableEntryValid(entry);
 				validityExtended = true;
 			}
@@ -716,21 +716,16 @@ public class AodvService extends NetworkLayerService {
 	};
 
 	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-		return Service.START_NOT_STICKY;
-	}
-
-	@Override
 	public IBinder onBind(Intent intent) {
 		return mBinder;
 	}
+	
 
 	@Override
 	public void onDestroy() {
 		nodeDao.close();
 		unbindService(mConnection);
 		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
-		stopService(new Intent(this, BluetoothService.class));
 		super.onDestroy();
 	}
 
@@ -753,7 +748,12 @@ public class AodvService extends NetworkLayerService {
 	public void searchForDevices() {
 		physicalService.searchForNeighbours();
 	}
-
+	
+	@Override
+	public void stopSearchingForDevices() {
+		physicalService.cancelSearchingForNeighbours();
+	}
+	
 	@Override
 	public void connectToNeighbours() {
 		physicalService.connectToNeighbours();

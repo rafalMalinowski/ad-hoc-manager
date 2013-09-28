@@ -3,6 +3,7 @@ package pl.rmalinowski.adhocmanager;
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
 import pl.rmalinowski.adhocmanager.api.impl.BluetoothService;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.utils.AhHocManagerConfiguration;
 import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import android.content.ComponentName;
 import android.content.Context;
@@ -41,7 +42,7 @@ public class ManageNodeActivity extends AbstractAdHocManagerActivity implements 
 	@Override
 	protected void onResume() {
 		super.onResume();
-		bindService(new Intent(this, BluetoothService.class), physicalConnection, Context.BIND_AUTO_CREATE);
+		bindService(new Intent(this, AhHocManagerConfiguration.physicalLayerClass), physicalConnection, Context.BIND_AUTO_CREATE);
 	}
 
 	@Override
