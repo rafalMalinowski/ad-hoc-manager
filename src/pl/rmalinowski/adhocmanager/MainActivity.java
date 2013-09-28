@@ -80,6 +80,10 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 			Intent enableIntent = new Intent(actionName);
 			startActivityForResult(enableIntent, ADAPTED_DISABLED_BROADCAST_EVENT);
 			break;
+		case TOAST:
+			String textToShow = (String) event.getData();
+			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
+			break;
 		default:
 			break;
 		}

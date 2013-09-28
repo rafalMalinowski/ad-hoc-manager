@@ -27,9 +27,8 @@ import pl.rmalinowski.adhocmanager.model.packets.RREPMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RREQMessage;
 import pl.rmalinowski.adhocmanager.model.packets.RoutingPacket;
 import pl.rmalinowski.adhocmanager.persistence.NodeDao;
-import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import pl.rmalinowski.adhocmanager.utils.AhHocManagerConfiguration;
-import android.app.Service;
+import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -64,12 +63,6 @@ public class AodvService extends NetworkLayerService {
 		super.onCreate();
 	}
 	
-	@SuppressWarnings("rawtypes")
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-		return Service.START_NOT_STICKY;
-	}
-
 	private void initializeNetworkLayer() {
 		nodeSequenceNumber = 1;
 		rreqMessageId = 1;

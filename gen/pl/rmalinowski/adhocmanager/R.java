@@ -52,6 +52,7 @@ public final class R {
         public static final int manage_button_disconnect=0x7f09000c;
         public static final int manage_button_send=0x7f09000b;
         public static final int manage_button_spam=0x7f09000d;
+        public static final int routing=0x7f090016;
         public static final int routing_table=0x7f090009;
         public static final int textView1=0x7f090005;
     }
@@ -65,6 +66,7 @@ public final class R {
     }
     public static final class menu {
         public static final int main=0x7f080000;
+        public static final int routing=0x7f080001;
     }
     public static final class string {
         public static final int action_settings=0x7f060001;

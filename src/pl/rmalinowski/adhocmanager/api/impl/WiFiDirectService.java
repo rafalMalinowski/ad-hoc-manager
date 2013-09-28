@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -16,6 +17,7 @@ import pl.rmalinowski.adhocmanager.events.PhysicalLayerEventType;
 import pl.rmalinowski.adhocmanager.model.Node;
 import pl.rmalinowski.adhocmanager.model.PhysicalLayerState;
 import pl.rmalinowski.adhocmanager.model.packets.Packet;
+import pl.rmalinowski.adhocmanager.model.packets.WifiHelloPacket;
 import pl.rmalinowski.adhocmanager.persistence.NodeDao;
 import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import pl.rmalinowski.adhocmanager.utils.SerializationUtils;
@@ -27,17 +29,22 @@ import android.net.NetworkInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ActionListener;
 import android.net.wifi.p2p.WifiP2pManager.Channel;
+import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
 import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
+import android.net.wifi.p2p.WifiP2pManager.GroupInfoListener;
 import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-public class WiFiDirectService extends PhysicalLayerService implements PeerListListener, ConnectionInfoListener {
+public class WiFiDirectService extends PhysicalLayerService implements PeerListListener, ConnectionInfoListener, ChannelListener, GroupInfoListener {
 
 	private final IBinder mBinder = new MyBinder();
 	private static final String TAG = "WiFiDirectService";
@@ -45,6 +52,7 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 	private NodeDao nodeDao;
 	private WifiP2pManager mManager;
 	private Channel mChannel;
+//	private Channel mChannel2;
 	private WifiP2pDevice localDevice;
 	private Map<String, ConnectionThread> connectedDevices;
 
@@ -56,12 +64,6 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		nodeDao.open();
 		super.onCreate();
 	}
-	
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-		// TODO Auto-generated method stub
-		return START_NOT_STICKY;
-	}
 
 	private void registerBroadcastRecievers() {
 		IntentFilter mIntentFilter = new IntentFilter();
@@ -71,7 +73,7 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
 
 		this.registerReceiver(broadcastReceiver, mIntentFilter);
-		
+
 		LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, new IntentFilter(PhysicalLayerService.PHYSICAL_LAYER_MESSAGE));
 	}
 
@@ -80,20 +82,25 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		state = PhysicalLayerState.INITIALIZING;
 		mManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
 		mChannel = (Channel) mManager.initialize(this, getMainLooper(), null);
+//		mChannel2 = (Channel) mManager.initialize(this, getMainLooper(), null);
 		connectedDevices = new HashMap<String, ConnectionThread>();
 		sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PHYSICAL_LAYER_INITIALIZED));
 	}
 
 	@Override
 	public void sendPacket(Packet packet, String destination) {
-		// TODO Auto-generated method stub
-
+		if (connectedDevices !=null && connectedDevices.containsKey(destination)) {
+			connectedDevices.get(destination).write(packet);
+		}
 	}
 
 	@Override
 	public void sendPacketBroadcast(Packet packet) {
-		// TODO Auto-generated method stub
-
+		if (connectedDevices != null) {
+			for (ConnectionThread thread : connectedDevices.values()) {
+				thread.write(packet);
+			}
+		}
 	}
 
 	@Override
@@ -106,25 +113,25 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 			@Override
 			public void onFailure(int reasonCode) {
-				Log.d(TAG, "nie udalo sie rozpoczecie poszukiwan");
+				Log.d(TAG, "nie udalo sie rozpoczecie poszukiwan, powod : " + reasonCode);
 			}
 		});
 	}
-	
+
 	@Override
 	public void cancelSearchingForNeighbours() {
 		mManager.stopPeerDiscovery(mChannel, new ActionListener() {
-			
+
 			@Override
 			public void onSuccess() {
 				Log.d(TAG, "udalo sie anulowanie poszukiwan");
-				
+
 			}
-			
+
 			@Override
 			public void onFailure(int reason) {
 				Log.d(TAG, "nie udalo sie anulowanie poszukiwan");
-				
+
 			}
 		});
 	}
@@ -137,8 +144,13 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public Set<Node> getConnectedDevices() {
-		// TODO Auto-generated method stub
-		return null;
+		Set<Node> returnNodes = new HashSet<Node>();
+		for (Node node : nodeDao.getAllNodes()) {
+			if (isCommunicationWithDeviceActive(node.getAddress())) {
+				returnNodes.add(node);
+			}
+		}
+		return returnNodes;
 	}
 
 	@Override
@@ -148,8 +160,11 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public void sendPacketBroadcastExceptOneAddress(Packet packet, String address) {
-		// TODO Auto-generated method stub
-
+		for (ConnectionThread thread : connectedDevices.values()) {
+			if (!address.equals(thread.getAddress())) {
+				thread.write(packet);
+			}
+		}
 	}
 
 	@Override
@@ -163,11 +178,14 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 			String action = intent.getAction();
 			if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
+				Log.d(TAG, "Broadcast: WIFI_P2P_STATE_CHANGED_ACTION");
 				int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
 				if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
 					Log.d(TAG, "jest ok");
+					sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "Wifi Direct enabled"));
 				} else {
 					Log.d(TAG, "srednio :/");
+					sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "Wifi Direct disabled"));
 				}
 
 				// metoda uruchamiana, gdy zostanie znalezione nowe urzadzenie
@@ -178,11 +196,13 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 				mManager.requestPeers(mChannel, WiFiDirectService.this);
 
 			} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
+				Log.d(TAG, "Broadcast: WIFI_P2P_CONNECTION_CHANGED_ACTION");
 				NetworkInfo networkInfo = (NetworkInfo) intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 				if (networkInfo.isConnected()) {
 					mManager.requestConnectionInfo(mChannel, WiFiDirectService.this);
 				}
 			} else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
+				Log.d(TAG, "Broadcast: WIFI_P2P_THIS_DEVICE_CHANGED_ACTION");
 				localDevice = (WifiP2pDevice) intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE);
 			} else if (PhysicalLayerService.PHYSICAL_LAYER_MESSAGE.equals(action)) {
 				Log.d(TAG, "test");
@@ -193,11 +213,30 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public void onDestroy() {
-		if (nodeDao != null){
-			nodeDao.close();			
+		try{
+			stopAllThreads();
+			if (mManager != null) {
+				mManager.removeGroup(mChannel, null);
+			}
+			
+			if (nodeDao != null) {
+				nodeDao.close();
+			}
+			unregisterReceiver(broadcastReceiver);			
+		} catch(Exception e){
+			Log.d(TAG, "blad przy niszczeniu serwisu");
 		}
-		unregisterReceiver(broadcastReceiver);
 		super.onDestroy();
+	}
+	
+	private void stopAllThreads() {
+
+		if (connectedDevices != null) {
+			for (ConnectionThread thread : connectedDevices.values()) {
+				thread.cancel();
+			}
+		}
+		connectedDevices = null;
 	}
 
 	@Override
@@ -208,12 +247,12 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 			@Override
 			public void onSuccess() {
-				// udalo sie wyslac zadanie
-
+				Log.d(TAG, "udalo sie rozpoczecie polaczenia");
 			}
 
 			@Override
 			public void onFailure(int reason) {
+				Log.d(TAG, "nie udalo sie rozpoczecie polaczenia, powod: " + reason);
 				// nie udalo wyslac sie zadania, tak wiec ponow probe o ile
 				// maksymalna liczba prob nie zostala wykorzystana
 				int decreasedNumberOfRetries = numberOfRetries - 1;
@@ -227,8 +266,19 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public void disconnectFromDevice(String address) {
-		// TODO Auto-generated method stub
+		if (isCommunicationWithDeviceActive(address)) {
+			ConnectionThread connectionThread = connectedDevices.get(address);
+			connectionThread.cancel();
+		}
 
+	}
+
+	private boolean isCommunicationWithDeviceActive(String address) {
+		if (connectedDevices.containsKey(address)) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	private void sendPhysicalBroadcast(PhysicalLayerEvent event) {
@@ -237,20 +287,52 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
 	}
 
+	private Handler helloMessageHandler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+
+			ConnectionThread connectionThread = (ConnectionThread) msg.obj;
+			WifiHelloPacket helloPacket = new WifiHelloPacket(localDevice.deviceAddress);
+			connectionThread.write(helloPacket);
+		}
+	};
+
 	private synchronized void startCommunication(Socket socket) {
-		// sendPhysicalBroadcast(new
-		// PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_ESTABLISHED,
-		// socket.));
-		ConnectionThread connectionThread = new ConnectionThread(socket);
+
+		final ConnectionThread connectionThread = new ConnectionThread(socket);
 		connectionThread.start();
+
+		Message message = new Message();
+		message.obj = connectionThread;
+		// po sekundzie wyslij wiadomosc hello
+		helloMessageHandler.sendMessageDelayed(message, 1000);
+	}
+	
+	private synchronized void handleDisconnect(String macAddress){
+		sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_LOST, macAddress));
+		if (connectedDevices.containsKey(macAddress)){
+			connectedDevices.remove(macAddress);
+		}
+//		mManager.removeGroup(mChannel, null);
+//		mManager.cancelConnect(mChannel, null);
+	}
+
+	private synchronized void newConnectionEstablished(ConnectionThread connectionThread, String macAddress) {
+		connectedDevices.put(macAddress, connectionThread);
+		sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.CONNECTION_TO_NEIGHBOUR_ESTABLISHED, macAddress));
+		sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, macAddress));
 	}
 
 	// ////////////////// WIFI DIRECT INTERFACES METHODS //////////////////////
 
 	@Override
 	public void onPeersAvailable(WifiP2pDeviceList peers) {
+		Log.d(TAG, "onPeersAvailable. Dostepne peery:");
 
+		sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "New peers found. Total size:" + peers.getDeviceList().size()));
 		for (WifiP2pDevice device : peers.getDeviceList()) {
+
+			Log.d(TAG, "- nazwa: " + device.deviceName + "  adres: " + device.deviceAddress);
 			Boolean deviceAlreadyKnown = false;
 			for (Node node : nodeDao.getAllNodes()) {
 				if (node.getAddress().equals(device.deviceAddress)) {
@@ -273,24 +355,43 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public void onConnectionInfoAvailable(WifiP2pInfo info) {
+
+
 		String groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
 		// czy udalo sie utworzyc grupe z drugim urzadzeniem
 		if (info.groupFormed) {
 			// jezeli wezel jest wlascicielem grupy to powinien rozpoczac
 			// nasluchiwanie nowego polaczenia
 			if (info.isGroupOwner) {
+				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "Udalo sie polaczyc jako GO, adres to " + info.groupOwnerAddress.getHostAddress()));
 				GroupOwnerThread groupOwnerThread = new GroupOwnerThread(groupOwnerAddress);
 				groupOwnerThread.start();
 			}
 			// jezeli nie jest wlascicielem grupy to powinien rozpoczac probe
 			// polaczenia sie z drugim wezlem
 			else {
+				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "Udalo sie polaczyc jako client, adres to " + info.groupOwnerAddress.getHostAddress()));
 				ClientThread clientThread = new ClientThread(groupOwnerAddress);
 				clientThread.start();
 			}
+		} else {
+			sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.TOAST, "Nie udalo sie polaczyc jako client"));
 		}
 
 	};
+	
+
+	@Override
+	public void onGroupInfoAvailable(WifiP2pGroup group) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onChannelDisconnected() {
+		// TODO Auto-generated method stub
+		
+	}
 
 	// ///////////////// watki odpowiedzialne za komunikacje ///////////////////
 
@@ -306,6 +407,7 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		public void run() {
 			try {
 				socket = new ServerSocket(4545);
+				socket.setReuseAddress(true);
 				Socket acceptedSocket = socket.accept();
 				startCommunication(acceptedSocket);
 			} catch (IOException e) {
@@ -353,6 +455,7 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		private Socket socket;
 		private InputStream iStream;
 		private OutputStream oStream;
+		private String macAddress;
 
 		public ConnectionThread(Socket socket) {
 			super();
@@ -374,12 +477,22 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 							break;
 						}
 						Packet packet = (Packet) SerializationUtils.deserialize(buffer);
+
+						if (packet instanceof WifiHelloPacket) {
+							WifiHelloPacket helloPacket = (WifiHelloPacket) packet;
+							newConnectionEstablished(this, helloPacket.getMacAddress());
+							macAddress = helloPacket.getMacAddress();
+						}
+
 						sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PACKET_RECEIVED, packet));
 
 						Log.d(TAG, "Rec:" + String.valueOf(buffer));
 
 					} catch (IOException e) {
 						Log.e(TAG, "disconnected", e);
+						handleDisconnect(macAddress);
+						
+						break;
 					} catch (ClassNotFoundException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -412,7 +525,20 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 				sendPhysicalBroadcast(new PhysicalLayerEvent(PhysicalLayerEventType.PACKET_SEND, packet));
 			} catch (IOException e) {
 				Log.e(TAG, "Exception during write", e);
+				handleDisconnect(macAddress);
 			}
+		}
+		
+		public void cancel() {
+			try {
+				socket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		public String getAddress(){
+			return macAddress;
 		}
 
 	}

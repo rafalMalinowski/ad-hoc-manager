@@ -4,12 +4,15 @@ import java.util.Date;
 import java.util.Set;
 
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
+import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntryState;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
@@ -38,6 +41,24 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 		}
 	}
 
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		getMenuInflater().inflate(R.menu.routing, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case R.id.routing:
+			networkService.searchForDevices();
+			return true;
+		default:
+			break;
+		}
+		return false;
+	}
+
 	protected void handleNetworkLayerEvent(NetworkLayerEvent event) {
 		switch (event.getEventType()) {
 		case SHOW_TOAST:
@@ -47,7 +68,7 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 			break;
 		case DATA_RECIEVED:
 			textToShow = (String) event.getData();
-//			Toast.makeText(this, textToShow, Toast.LENGTH_SHORT).show();
+			Toast.makeText(this, textToShow, Toast.LENGTH_SHORT).show();
 			initialize();
 			break;
 		case NETWORK_STATE_CHANGED:
@@ -55,6 +76,18 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 			break;
 		case DESTINATION_UNREACHABLE:
 			Toast.makeText(this, "nie udalo sie wyslanie wiadomosci", Toast.LENGTH_LONG).show();
+			break;
+		default:
+			break;
+		}
+	}
+
+	@Override
+	protected void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
+		switch (event.getEventType()) {
+		case TOAST:
+			String textToShow = (String) event.getData();
+			Toast.makeText(this, textToShow, Toast.LENGTH_LONG).show();
 			break;
 		default:
 			break;
