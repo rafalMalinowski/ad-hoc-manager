@@ -15,7 +15,6 @@ import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEventType;
 import pl.rmalinowski.adhocmanager.events.PhysicalLayerEvent;
-import pl.rmalinowski.adhocmanager.exceptions.BadAddressException;
 import pl.rmalinowski.adhocmanager.model.ErrorNode;
 import pl.rmalinowski.adhocmanager.model.Node;
 import pl.rmalinowski.adhocmanager.model.RoutingTableEntry;
@@ -62,7 +61,7 @@ public class AodvService extends NetworkLayerService {
 		bindService(new Intent(this, AhHocManagerConfiguration.physicalLayerClass), mConnection, Context.BIND_AUTO_CREATE);
 		super.onCreate();
 	}
-	
+
 	private void initializeNetworkLayer() {
 		nodeSequenceNumber = 1;
 		rreqMessageId = 1;
@@ -145,7 +144,9 @@ public class AodvService extends NetworkLayerService {
 	private void handlePhysicalLayerEvent(PhysicalLayerEvent event) {
 		switch (event.getEventType()) {
 		case ADAPTER_NOT_ENABLED:
-//			sendNetworkBroadcast(new NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED, event.getData()));
+			// sendNetworkBroadcast(new
+			// NetworkLayerEvent(NetworkLayerEventType.ADAPTED_DISABLED,
+			// event.getData()));
 			break;
 		case CONNECTION_TO_NEIGHBOUR_ESTABLISHED:
 			String address = (String) event.getData();
@@ -179,28 +180,6 @@ public class AodvService extends NetworkLayerService {
 		default:
 			break;
 		}
-	}
-
-	@Override
-	public void test1() {
-		Log.d(TAG, "test1");
-		// RoutingTableEntry entry = routingTable.get(0);
-		// RREQMessage rreqMessage = generateRREQMessage(entry);
-		// physicalService.sendPacket(rreqMessage, entry.getNextHopAddress());
-	}
-
-	@Override
-	public void test2() {
-		Set<Node> nodes = nodeDao.getAllNodes();
-		for (Node node : nodes) {
-			nodeDao.delete(node.getId());
-		}
-		Log.d(TAG, "test2");
-	}
-
-	@Override
-	public void test3() {
-		Log.d(TAG, "test3");
 	}
 
 	private void handleRecievedPacket(Packet packet) {
@@ -546,8 +525,8 @@ public class AodvService extends NetworkLayerService {
 				}
 			}
 		}
-		
-		public void cancel(){
+
+		public void cancel() {
 			active = false;
 		}
 	}
@@ -718,7 +697,6 @@ public class AodvService extends NetworkLayerService {
 	public IBinder onBind(Intent intent) {
 		return mBinder;
 	}
-	
 
 	@Override
 	public void onDestroy() {
@@ -748,12 +726,12 @@ public class AodvService extends NetworkLayerService {
 	public void searchForDevices() {
 		physicalService.searchForNeighbours();
 	}
-	
+
 	@Override
 	public void stopSearchingForDevices() {
 		physicalService.cancelSearchingForNeighbours();
 	}
-	
+
 	@Override
 	public void connectToNeighbours() {
 		physicalService.connectToNeighbours();
@@ -778,10 +756,10 @@ public class AodvService extends NetworkLayerService {
 				}
 			}
 		}
-		//jesli w tablicy rutingu jest taki wpis to go zwroc
-		if (result != null){
+		// jesli w tablicy rutingu jest taki wpis to go zwroc
+		if (result != null) {
 			return result;
-		} 
+		}
 		// jezeli nie ma, to stworz nowy node i dodaj wpis
 		else {
 			Node newNode = new Node(address, "");
@@ -809,8 +787,7 @@ public class AodvService extends NetworkLayerService {
 
 	@Override
 	public void cancelAll() {
-		
-		
+		physicalService.cancelAll();
 	}
 
 }

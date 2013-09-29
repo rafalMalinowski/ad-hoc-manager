@@ -21,12 +21,6 @@ public interface INetworkLayerService{
 	public void connectToNeighbours();
 	
 	public List<String> getNodes();
-	
-	public void test1();
-
-	public void test2();
-
-	public void test3();
 
 	public Set<RoutingTableEntry> getRoutingTable();
 	

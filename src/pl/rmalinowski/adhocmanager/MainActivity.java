@@ -51,12 +51,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		deviceListButton.setOnClickListener(this);
 	}
 
-	@SuppressWarnings("rawtypes")
 	private void startServices() {
-
-		// startService(new Intent(this,
-		// AhHocManagerConfiguration.physicalLayerClass));
-
 		startService(new Intent(this, AhHocManagerConfiguration.networkLayerClass));
 	}
 
@@ -116,7 +111,7 @@ public class MainActivity extends AbstractAdHocManagerActivity implements OnClic
 		switch (requestCode) {
 		case ADAPTED_DISABLED_BROADCAST_EVENT:
 			if (resultCode == Activity.RESULT_OK) {
-				// everything is ok
+				// wszystko jest ok
 				networkService.reInitialize();
 			} else {
 				finish();

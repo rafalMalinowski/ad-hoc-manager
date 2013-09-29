@@ -1,10 +1,8 @@
 package pl.rmalinowski.adhocmanager;
 
 import pl.rmalinowski.adhocmanager.api.PhysicalLayerService;
-import pl.rmalinowski.adhocmanager.api.impl.BluetoothService;
 import pl.rmalinowski.adhocmanager.events.NetworkLayerEvent;
 import pl.rmalinowski.adhocmanager.utils.AhHocManagerConfiguration;
-import pl.rmalinowski.adhocmanager.utils.AodvContants;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;

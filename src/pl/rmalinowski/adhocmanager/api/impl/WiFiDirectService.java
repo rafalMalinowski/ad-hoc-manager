@@ -34,14 +34,11 @@ import android.net.NetworkInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
-import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ActionListener;
 import android.net.wifi.p2p.WifiP2pManager.Channel;
-import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
 import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
-import android.net.wifi.p2p.WifiP2pManager.GroupInfoListener;
 import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
 import android.os.Handler;
 import android.os.IBinder;
@@ -49,14 +46,12 @@ import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-public class WiFiDirectService extends PhysicalLayerService implements PeerListListener, ConnectionInfoListener, ChannelListener, GroupInfoListener {
+public class WiFiDirectService extends PhysicalLayerService implements PeerListListener, ConnectionInfoListener {
 
 	private static final int START_CONTINUE = 1;
-	private static final int STOP = 2;
 
 	private final IBinder mBinder = new MyBinder();
 	private static final String TAG = "WiFiDirectService";
-	private volatile PhysicalLayerState state;
 	private NodeDao nodeDao;
 	private WifiP2pManager mManager;
 	private Channel mChannel;
@@ -88,7 +83,6 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	@Override
 	public void initialize() {
-		state = PhysicalLayerState.INITIALIZING;
 		mManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
 		mChannel = (Channel) mManager.initialize(this, getMainLooper(), null);
 		connectedDevices = new HashMap<String, ConnectionThread>();
@@ -438,18 +432,6 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 	};
 
-	@Override
-	public void onGroupInfoAvailable(WifiP2pGroup group) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void onChannelDisconnected() {
-		// TODO Auto-generated method stub
-
-	}
-
 	// ///////////////// watki odpowiedzialne za komunikacje ///////////////////
 
 	private class GroupOwnerThread extends Thread {
@@ -464,12 +446,9 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 		public void run() {
 			try {
 				socket = new ServerSocket(4545);
-				// socket.setReuseAddress(true);
 				while (true) {
 					startCommunication(socket.accept());
 				}
-				// Socket acceptedSocket = socket.accept();
-				// startCommunication(acceptedSocket);
 			} catch (Exception e) {
 				try {
 					if (socket != null && !socket.isClosed())
@@ -602,12 +581,6 @@ public class WiFiDirectService extends PhysicalLayerService implements PeerListL
 
 		public void cancel() {
 			try {
-				// if (!socket.isInputShutdown()){
-				// socket.shutdownInput();
-				// }
-				// if (!socket.isOutputShutdown()){
-				// socket.shutdownOutput();
-				// }
 				if (!socket.isClosed()) {
 					socket.close();
 				}

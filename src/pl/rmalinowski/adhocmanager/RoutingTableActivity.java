@@ -15,7 +15,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.View.OnLongClickListener;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -169,21 +168,7 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 					startActivity(intent);
 				}
 			});
-			// tr.setOnLongClickListener(new OnLongClickListener() {
-			//
-			// @Override
-			// public boolean onLongClick(View v) {
-			// TableRow tablerow = (TableRow) v;
-			// TextView textView = (TextView)
-			// tablerow.getChildAt(ADDRESS_IN_TABLE_POSITON);
-			// Intent intent = new Intent(getBaseContext(),
-			// ManageNodeActivity.class);
-			// intent.putExtra(ManageNodeActivity.ADDRESS_INTENT_EXTRA,
-			// textView.getText());
-			// startActivity(intent);
-			// return true;
-			// }
-			// });
+
 			table.addView(tr);
 		}
 		initialized = true;

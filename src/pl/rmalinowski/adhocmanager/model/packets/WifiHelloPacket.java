@@ -1,7 +1,9 @@
 package pl.rmalinowski.adhocmanager.model.packets;
 
 public class WifiHelloPacket extends Packet {
-	
+
+	private static final long serialVersionUID = 1L;
+
 	public WifiHelloPacket(String macAddress) {
 		super();
 		this.macAddress = macAddress;

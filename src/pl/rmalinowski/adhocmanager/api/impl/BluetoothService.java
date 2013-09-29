@@ -283,11 +283,7 @@ public class BluetoothService extends PhysicalLayerService {
 				for (int i = 0; i < localPossibleUuids.size() && active; i++) {
 					try {
 						serverSocket = BluetoothAdapter.getDefaultAdapter().listenUsingRfcommWithServiceRecord(APP_NAME, localPossibleUuids.get(i));
-						// serverSocket =
-						// BluetoothAdapter.getDefaultAdapter().listenUsingInsecureRfcommWithServiceRecord(APP_NAME,
-						// localPossibleUuids.get(i));
 
-						// trying to connect
 						BluetoothSocket socket = serverSocket.accept();
 						serverSocket.close();
 						possibleUuids.remove(possibleUuids.indexOf(localPossibleUuids.get(i)));
@@ -318,7 +314,6 @@ public class BluetoothService extends PhysicalLayerService {
 		BluetoothDevice blueDevice;
 		private static final int CONNECTION_RETRY_DELAY = 25;
 		private boolean active;
-		// private String selectedUuid;
 
 		BluetoothSocket blueSocket = null;
 		int numberOfRetries = 0;
@@ -346,8 +341,6 @@ public class BluetoothService extends PhysicalLayerService {
 					try {
 						if (active) {
 							blueSocket = blueDevice.createRfcommSocketToServiceRecord(possibleUuids.get(i));
-							// blueSocket =
-							// blueDevice.createInsecureRfcommSocketToServiceRecord(possibleUuids.get(i));
 							blueSocket.connect();
 						} else {
 							break;
@@ -475,7 +468,6 @@ public class BluetoothService extends PhysicalLayerService {
 		possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
 		 possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
 		 possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
-		// possibleUuids.add(UUID.fromString("503c7435-bc23-11de-8a39-0800200c9a66"));
 	}
 
 	@Override
@@ -521,7 +513,6 @@ public class BluetoothService extends PhysicalLayerService {
 
 	@Override
 	public void cancelAll() {
-		// TODO Auto-generated method stub
 		
 	}
 
