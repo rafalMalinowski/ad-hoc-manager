@@ -29,4 +29,5 @@ public interface IPhysicalLayerService {
 	
 	public void disconnectFromDevice(String address);
 	
+	public void cancelAll();
 }

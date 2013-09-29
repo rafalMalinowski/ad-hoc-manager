@@ -526,16 +526,18 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private class CheckRoutingTableThread extends Thread {
+		private boolean active;
 		private final int checkInterval;
 
 		public CheckRoutingTableThread(int checkInterval) {
 			super();
 			this.checkInterval = checkInterval;
+			active = true;
 		}
 
 		@Override
 		public void run() {
-			while (true) {
+			while (active) {
 				updateRoutingTableEntries();
 				try {
 					Thread.sleep(checkInterval);
@@ -543,6 +545,10 @@ public class AodvService extends NetworkLayerService {
 					Log.d(TAG, "przerwano watek!");
 				}
 			}
+		}
+		
+		public void cancel(){
+			active = false;
 		}
 	}
 
@@ -619,7 +625,7 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private void makeRoutingTableEntryValid(String address) {
-		if (address != null) {
+		if (address != null && !address.equals(physicalService.getLocalAddress())) {
 			RoutingTableEntry entry = findRoutingTableEntryForAddress(address);
 			makeRoutingTableEntryValid(entry);
 		}
@@ -716,6 +722,7 @@ public class AodvService extends NetworkLayerService {
 
 	@Override
 	public void onDestroy() {
+		checkRoutingTableThread.cancel();
 		nodeDao.close();
 		unbindService(mConnection);
 		LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
@@ -762,14 +769,28 @@ public class AodvService extends NetworkLayerService {
 	}
 
 	private RoutingTableEntry findRoutingTableEntryForAddress(String address) {
+		RoutingTableEntry result = null;
 		if (address != null) {
 			for (RoutingTableEntry entry : routingTable) {
 				if (address.equals(entry.getDestinationNode().getAddress())) {
-					return entry;
+					result = entry;
+					break;
 				}
 			}
 		}
-		throw new BadAddressException();
+		//jesli w tablicy rutingu jest taki wpis to go zwroc
+		if (result != null){
+			return result;
+		} 
+		// jezeli nie ma, to stworz nowy node i dodaj wpis
+		else {
+			Node newNode = new Node(address, "");
+			long id = nodeDao.create(newNode);
+			newNode.setId(id);
+			result = new RoutingTableEntry(newNode);
+			routingTable.add(result);
+			return result;
+		}
 	}
 
 	@Override
@@ -784,6 +805,12 @@ public class AodvService extends NetworkLayerService {
 	@Override
 	public Set<RoutingTableEntry> getRoutingTable() {
 		return routingTable;
+	}
+
+	@Override
+	public void cancelAll() {
+		
+		
 	}
 
 }

@@ -34,6 +34,7 @@ public final class R {
     public static final class id {
         public static final int bluetooth_button_find_devices=0x7f090001;
         public static final int bluetooth_button_start=0x7f090000;
+        public static final int cancel=0x7f090017;
         public static final int cell_address=0x7f090010;
         public static final int cell_hopCount=0x7f090012;
         public static final int cell_id=0x7f09000e;
@@ -73,6 +74,7 @@ public final class R {
         public static final int ad_hoc_manager=0x7f060015;
         public static final int app_name=0x7f060000;
         public static final int bluetooth=0x7f060004;
+        public static final int cancel=0x7f060018;
         public static final int connect=0x7f060009;
         public static final int device_discovery=0x7f060010;
         public static final int disconnect=0x7f060014;

@@ -29,4 +29,6 @@ public interface INetworkLayerService{
 	public void test3();
 
 	public Set<RoutingTableEntry> getRoutingTable();
+	
+	public void cancelAll();
 }

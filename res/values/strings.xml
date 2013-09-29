@@ -25,5 +25,6 @@
     <string name="ad_hoc_manager">AdHoc Manager</string>
     <string name="spam">Spam</string>
     <string name="search_stop">Stop Searching</string>
+    <string name="cancel">Cancel</string>
 
 </resources>

@@ -53,6 +53,9 @@ public class RoutingTableActivity extends AbstractAdHocManagerActivity {
 		case R.id.routing:
 			networkService.searchForDevices();
 			return true;
+		case R.id.cancel:
+			networkService.cancelAll();
+			return true;
 		default:
 			break;
 		}

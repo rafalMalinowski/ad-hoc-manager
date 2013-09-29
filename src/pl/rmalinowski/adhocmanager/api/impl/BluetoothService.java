@@ -473,8 +473,8 @@ public class BluetoothService extends PhysicalLayerService {
 		possibleUuids.add(UUID.fromString("503c7430-bc23-11de-8a39-0800200c9a66"));
 		possibleUuids.add(UUID.fromString("503c7431-bc23-11de-8a39-0800200c9a66"));
 		possibleUuids.add(UUID.fromString("503c7432-bc23-11de-8a39-0800200c9a66"));
-		// possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
-		// possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
+		 possibleUuids.add(UUID.fromString("503c7433-bc23-11de-8a39-0800200c9a66"));
+		 possibleUuids.add(UUID.fromString("503c7434-bc23-11de-8a39-0800200c9a66"));
 		// possibleUuids.add(UUID.fromString("503c7435-bc23-11de-8a39-0800200c9a66"));
 	}
 
@@ -517,6 +517,12 @@ public class BluetoothService extends PhysicalLayerService {
 	@Override
 	public String getLocalAddress() {
 		return bluetoothAdapter.getAddress();
+	}
+
+	@Override
+	public void cancelAll() {
+		// TODO Auto-generated method stub
+		
 	}
 
 
